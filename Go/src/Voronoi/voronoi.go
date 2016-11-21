@@ -63,7 +63,7 @@ func (v Voronoi)ConvexHull() ConvexHull {
             convexHullList = append(convexHullList, nextFace)
             lastEdge = nextFace.EEdge
             // find last edge of that face.
-            for lastEdge.ENext != EmptyEdge {
+            for *lastEdge.ENext != *EmptyEdge {
                 lastEdge = lastEdge.ENext
             }
             nextFace = lastEdge.ETwin.FFace
@@ -139,7 +139,7 @@ func createTrivialVoronoi(points PointList) Voronoi {
 
 // Calculates the face with the 'best' (y-coord) reference point.
 // Can be used to calculate the lowest or highest point with the appropriate function.
-func (ch ConvexHull) betterPoint(isBetter func(y1, y2 float32) bool) *HEFace {
+func (ch ConvexHull) bestPoint(isBetter func(y1, y2 float32) bool) *HEFace {
     bestFace := ch[0]
     for _,face := range ch {
         if isBetter(face.ReferencePoint.Y, bestFace.ReferencePoint.Y) {
@@ -164,7 +164,7 @@ func calcHighestIntersection(bisector Edge, p *HEFace, lastEdge *HEEdge) (*HEEdg
     edge = edge.ENext
 
     // Find be highest/best intersection of the bisector and and edge.
-    for edge != EmptyEdge && edge != p.EEdge {
+    for *edge != *EmptyEdge && *edge != *p.EEdge && *edge != *p.EEdge.ETwin {
 
         line = edge.Line(true)
         intersection := LineIntersection(bisector, line)
@@ -182,24 +182,34 @@ func calcHighestIntersection(bisector Edge, p *HEFace, lastEdge *HEEdge) (*HEEdg
 // They HAVE to be left/right of each other with NO overlapping. This HAS to be guaranteed!
 func mergeVoronoi(left, right Voronoi) Voronoi {
 
+    mergedVoronoi := Voronoi {
+        heVertexList: append(left.heVertexList, right.heVertexList...),
+        heEdgeList:   append(left.heEdgeList, right.heEdgeList...),
+        heFaceList:   append(left.heFaceList, right.heFaceList...),
+    }
+
     h1 := left.ConvexHull()
     h2 := right.ConvexHull()
 
     isHigher := func(y1, y2 float32) bool {
         return y1 > y2
     }
-    p := h1.betterPoint(isHigher)
-    q := h2.betterPoint(isHigher)
+    // p and q are faces!
+    p := h1.bestPoint(isHigher)
+    q := h2.bestPoint(isHigher)
 
     isLower := func(y1, y2 float32) bool {
         return y1 < y2
     }
-    h1Down := h1.betterPoint(isLower)
-    h2Down := h2.betterPoint(isLower)
+    h1Down := h1.bestPoint(isLower)
+    h2Down := h2.bestPoint(isLower)
 
     // We don't cross the same edge twice!
     lastPEdge := EmptyEdge
     lastQEdge := EmptyEdge
+    // This is either lastPEdge or lastQEdge.
+    lastUpEdge  := EmptyEdge
+    lastDownEdge  := EmptyEdge
 
     bisector := PerpendicularBisector(p.ReferencePoint, q.ReferencePoint)
 
@@ -211,20 +221,51 @@ func mergeVoronoi(left, right Voronoi) Voronoi {
 
         // Which intersection point do we take?
         if locationP.Y > locationQ.Y {
+
+
+
+            heVertex := HEVertex{
+                Pos:      locationP,
+                ELeaving: // new edge
+            }
+
+            heEdgeUp := HEEdge {
+                VOrigin:    &heVertex,
+                ETwin:      // heEdgeDown,
+                ENext:      , // The last UP edge maybe? The one with the same face...
+                FFace:      p,
+                TmpEdge:    bisector,
+            }
+            // heEdgeUp is now the first edge of face p. So we have to set the p-edge-pointer to that edge!
+            p.EEdge = &heEdgeUp
+
+            heEdgeDown := HEEdge {
+
+            }
+            lastDownEdge.ENext = &heEdgeDown
+
+            mergedVoronoi.heVertexList = append(mergedVoronoi.heVertexList, heVertex)
+            mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeUp)
+            mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeDown)
+
+
+
+
+
+
             // Do something with the voronoi...
             p = edgeP.ETwin.FFace
+            lastEdge = &heEdgeUp
         } else {
             // Do something with the voronoi...
             q = edgeQ.ETwin.FFace
+            lastEdge = edgeQ
         }
         bisector = PerpendicularBisector(p.ReferencePoint, q.ReferencePoint)
     }
 
-    return Voronoi {
-        heVertexList: append(left.heVertexList, right.heVertexList...),
-        heEdgeList:   append(left.heEdgeList, right.heEdgeList...),
-        heFaceList:   append(left.heFaceList, right.heFaceList...),
-    }
+    // Combine the datasets. They should be connected now anyway.
+    return mergedVoronoi
 }
 
 // Voronoi divide and conquer entry point
