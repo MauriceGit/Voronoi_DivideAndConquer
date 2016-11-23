@@ -5,7 +5,7 @@ import (
     . "Voronoi/Vector"
 )
 
-var InfiniteFace = &HEFace{}
+var EmptyFace    = &HEFace{}
 var EmptyEdge    = &HEEdge{}
 var EmptyVertex  = &HEVertex{}
 
@@ -13,6 +13,7 @@ type HEVertex struct {
     Pos             Vector
     // It is possible, several edges leave from this vertex.
     // Then it points to any one of them, arbitrarily.
+    // This shit doesn't help anyone, does it?
     ELeaving        *HEEdge
 }
 

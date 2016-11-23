@@ -10,9 +10,9 @@ import (
 )
 
 type Voronoi struct {
-    heVertexList    []HEVertex
-    heEdgeList      []HEEdge
-    heFaceList      []HEFace
+    heVertexList    []*HEVertex
+    heEdgeList      []*HEEdge
+    heFaceList      []*HEFace
 }
 
 type ConvexHull []*HEFace
@@ -35,12 +35,12 @@ func (v Voronoi) pprint () {
 // As there is an exactly 1:1 representation of Reference points and HEFaces,
 // a list of HEFaces is returned in Order (clockwise, as edges are counter-clockwise) of the convex hull.
 func (v Voronoi)ConvexHull() ConvexHull {
-    var outerFace = InfiniteFace
+    var outerFace = EmptyFace
 
     // find outer face as starting point for convex hull.
     for i,face := range v.heFaceList {
         if !face.IsClosed {
-            outerFace = &v.heFaceList[i]
+            outerFace = v.heFaceList[i]
             break
         }
     }
@@ -73,20 +73,43 @@ func (v Voronoi)ConvexHull() ConvexHull {
     return convexHullList
 }
 
+// So we can get a pointer of some data structure? What about scope issues?
+func createFace(refPoint Vector, eEdge *HEEdge, closed bool) *HEFace {
+    return &HEFace {
+        ReferencePoint: refPoint,
+        EEdge:          eEdge,
+        IsClosed:       closed,
+    }
+}
+
+// So we can get a pointer of some data structure? What about scope issues?
+func createEdge(vOrigin *HEVertex, eTwin, eNext *HEEdge, fFace *HEFace, tmpEdge Edge) *HEEdge {
+    return &HEEdge {
+        VOrigin:    vOrigin,
+        ETwin:      eTwin,
+        ENext:      eNext,
+        FFace:      fFace,
+        TmpEdge:    tmpEdge,
+    }
+}
+
+// So we can get a pointer of some data structure? What about scope issues?
+func createVertex(pos Vector, eLeaving *HEEdge) *HEVertex {
+    return &HEVertex {
+        Pos:        pos,
+        ELeaving:   eLeaving,
+    }
+}
+
 // There can only be 1 or 2 points in the list!!! This HAS to be guaranteed!
 func createTrivialVoronoi(points PointList) Voronoi {
 
     if len(points) == 1 {
         // A voronoi diagram with just one reference point is just a loosely defined face.
-        face := HEFace{
-            ReferencePoint: points[0],
-            EEdge:          EmptyEdge,
-            IsClosed:       false,
-        }
         return Voronoi{
-            heVertexList: []HEVertex{},
-            heEdgeList:   []HEEdge{},
-            heFaceList:   []HEFace{face},
+            heVertexList: []*HEVertex{},
+            heEdgeList:   []*HEEdge{},
+            heFaceList:   []*HEFace{createFace(points[0], EmptyEdge, false)},
         }
     } else {
         // Simple voronoi with two reference points.
@@ -94,42 +117,21 @@ func createTrivialVoronoi(points PointList) Voronoi {
         p2 := points[1]
         bisector := PerpendicularBisector(p1, p2)
 
-        edge1 := HEEdge {
-            VOrigin: EmptyVertex,
-            // ETwin empty for now
-            ENext: EmptyEdge,
-            // FFace empty for now
-            TmpEdge: bisector,
-        }
-        edge2 := HEEdge {
-            VOrigin: EmptyVertex,
-            ETwin: &edge1,
-            ENext: EmptyEdge,
-            // FFace empty for now
-            TmpEdge: bisector,
-        }
-        edge1.ETwin = &edge2
+        edge1 := createEdge(EmptyVertex, EmptyEdge, EmptyEdge, EmptyFace, bisector)
+        edge2 := createEdge(EmptyVertex, edge1, EmptyEdge, EmptyFace, bisector)
+        edge1.ETwin = edge2
 
-
-        face1 := HEFace {
-            ReferencePoint: p1,
-            EEdge: &edge1,
-            IsClosed: false,
-        }
-        face2 := HEFace {
-            ReferencePoint: p2,
-            EEdge: &edge2,
-            IsClosed: false,
-        }
+        face1 := createFace(p1, edge1, false)
+        face2 := createFace(p2, edge2, false)
 
         // Set references of the faces.
-        edge1.FFace = &face1
-        edge2.FFace = &face2
+        edge1.FFace = face1
+        edge2.FFace = face2
 
         return Voronoi {
-            heVertexList: []HEVertex{},
-            heEdgeList:   []HEEdge{edge1, edge2},
-            heFaceList:   []HEFace{face1, face2},
+            heVertexList: []*HEVertex{},
+            heEdgeList:   []*HEEdge{edge1, edge2},
+            heFaceList:   []*HEFace{face1, face2},
         }
     }
 
@@ -174,6 +176,11 @@ func calcHighestIntersection(bisector Edge, p *HEFace, lastEdge *HEEdge) (*HEEdg
         }
     }
 
+    // So
+    //if *bestEdge.FFace == *p {
+    //    bestEdge = bestEdge.ETwin
+    //}
+
     return bestEdge, bestIntersection
 }
 
@@ -210,6 +217,8 @@ func mergeVoronoi(left, right Voronoi) Voronoi {
     // This is either lastPEdge or lastQEdge.
     lastUpEdge  := EmptyEdge
     lastDownEdge  := EmptyEdge
+    // last vertex we created on that separation line
+    lastVertex := EmptyVertex
 
     bisector := PerpendicularBisector(p.ReferencePoint, q.ReferencePoint)
 
@@ -222,44 +231,68 @@ func mergeVoronoi(left, right Voronoi) Voronoi {
         // Which intersection point do we take?
         if locationP.Y > locationQ.Y {
 
+            heVertex := createVertex(locationP, EmptyEdge)
 
+            heEdgeUp := createEdge(heVertex, EmptyEdge, lastUpEdge, p, bisector)
 
-            heVertex := HEVertex{
-                Pos:      locationP,
-                ELeaving: // new edge
+            // We don't know yet, what the next Edge is! So we have to set that later!
+            heEdgeDown := createEdge(lastVertex, heEdgeUp, EmptyEdge, q, bisector)
+            heEdgeUp.ETwin = heEdgeDown
+            heVertex.ELeaving = heEdgeUp
+            lastDownEdge.ENext = heEdgeDown
+
+            // heEdgeDown could  now be the first edge of face q. But only, if this is the first cut.
+            if *lastDownEdge == *EmptyEdge {
+                q.EEdge = heEdgeDown
             }
-
-            heEdgeUp := HEEdge {
-                VOrigin:    &heVertex,
-                ETwin:      // heEdgeDown,
-                ENext:      , // The last UP edge maybe? The one with the same face...
-                FFace:      p,
-                TmpEdge:    bisector,
-            }
-            // heEdgeUp is now the first edge of face p. So we have to set the p-edge-pointer to that edge!
-            p.EEdge = &heEdgeUp
-
-            heEdgeDown := HEEdge {
-
-            }
-            lastDownEdge.ENext = &heEdgeDown
 
             mergedVoronoi.heVertexList = append(mergedVoronoi.heVertexList, heVertex)
             mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeUp)
             mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeDown)
 
 
+            lastUpEdge   = heEdgeUp
+            lastDownEdge = heEdgeDown
+            lastVertex   = heVertex
+            lastPEdge    = edgeP
 
-
-
-
-            // Do something with the voronoi...
             p = edgeP.ETwin.FFace
-            lastEdge = &heEdgeUp
+
         } else {
+
+            heVertex := createVertex(locationQ, EmptyEdge)
+
+            // todo: the next edge is NOT lastUpEdge... Only sometimes... shit.
+            heEdgeUp := createEdge(heVertex, EmptyEdge, lastUpEdge, p, bisector)
+
+            // We don't know yet, what the next Edge is! So we have to set that later!
+            // Shit. Next edge is also not the next edge every time...
+            heEdgeDown := createEdge(lastVertex, heEdgeUp, EmptyEdge, q, bisector)
+            heEdgeUp.ETwin = heEdgeDown
+            heVertex.ELeaving = heEdgeUp
+            lastDownEdge.ENext = heEdgeDown
+
+            // heEdgeDown could  now be the first edge of face q. But only, if this is the first cut.
+            if *lastDownEdge == *EmptyEdge {
+                q.EEdge = heEdgeDown
+            }
+
+            mergedVoronoi.heVertexList = append(mergedVoronoi.heVertexList, heVertex)
+            mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeUp)
+            mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeDown)
+
+
+            lastUpEdge   = heEdgeUp
+            lastDownEdge = heEdgeDown
+            lastVertex   = heVertex
+            lastPEdge    = edgeP
+
+            p = edgeP.ETwin.FFace
+
+
             // Do something with the voronoi...
             q = edgeQ.ETwin.FFace
-            lastEdge = edgeQ
+            //lastEdge = edgeQ
         }
         bisector = PerpendicularBisector(p.ReferencePoint, q.ReferencePoint)
     }
