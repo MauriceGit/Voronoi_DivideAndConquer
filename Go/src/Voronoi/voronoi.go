@@ -9,64 +9,72 @@ import (
     //"math"
 )
 
+// HAS to be an infinite face!
+type VoronoiEntryFace FaceIndex
+
+// List of indides to the faces, that form the convex hull.
+type ConvexHull []FaceIndex
+
 type Voronoi struct {
-    heVertexList    []*HEVertex
-    heEdgeList      []*HEEdge
-    heFaceList      []*HEFace
+    vertices           []HEVertex
+    firstFreeVertexPos VertexIndex
+    edges              []HEEdge
+    firstFreeEdgePos   EdgeIndex
+    faces              []HEFace
+    firstFreeFacePos   FaceIndex
 }
 
-type ConvexHull []*HEFace
 
-func (v Voronoi) pprintShort () {
-    fmt.Printf("Voronoi: ")
-    fmt.Printf("   Vertices: %v\n", len(v.heVertexList))
-    fmt.Printf("   Edges   : %v\n", len(v.heEdgeList))
-    fmt.Printf("   Faces   : %v\n", len(v.heFaceList))
-}
-func (v Voronoi) pprint () {
-    fmt.Printf("Voronoi: ")
-    fmt.Printf("   Vertices: %v\n", v.heVertexList)
-    fmt.Printf("   Edges   : %v\n", v.heEdgeList)
-    fmt.Printf("   Faces   : %v\n", v.heFaceList)
+func (v *Voronoi) pprint () {
+    fmt.Println("Voronoi:")
+    fmt.Printf("   Vertices (%v): ", v.firstFreeVertexPos)
+    var dummyV HEVertex
+    for _,ve := range v.vertices {
+        if ve != dummyV {
+            fmt.Printf("%v, ", ve)
+        }
+    }
+    fmt.Printf("\n")
+
+    fmt.Printf("   Edges    (%v): ", v.firstFreeEdgePos)
+    var dummyE HEEdge
+    for _,e := range v.edges {
+        if e != dummyE {
+            fmt.Printf("%v, ", e)
+        }
+    }
+    fmt.Printf("\n")
+
+    fmt.Printf("   Faces    (%v): ", v.firstFreeFacePos)
+    var dummyF HEFace
+    for _,f := range v.faces {
+        if f != dummyF {
+            fmt.Printf("%v, ", f)
+        }
+    }
+    fmt.Printf("\n")
 }
 
 // Calculates a convex hull for the given voronoi. Runs in O(n).
 // The convex hull consists of a list of Reference points.
 // As there is an exactly 1:1 representation of Reference points and HEFaces,
-// a list of HEFaces is returned in Order (clockwise, as edges are counter-clockwise) of the convex hull.
-func (v Voronoi)ConvexHull() ConvexHull {
-    var outerFace = EmptyFace
+// a list of face indices is returned in Order (counter-clockwise) of the convex hull.
+func (v *Voronoi)ConvexHull(fEntry VoronoiEntryFace) ConvexHull {
 
-    // find outer face as starting point for convex hull.
-    for i,face := range v.heFaceList {
-        if !face.IsClosed {
-            outerFace = v.heFaceList[i]
-            break
-        }
-    }
-    var firstFace = outerFace
-    var convexHullList = []*HEFace{outerFace}
+    f := FaceIndex(fEntry)
+    convexHullList := []FaceIndex{FaceIndex(f)}
 
-    lastEdge := outerFace.EEdge
+    edge := v.faces[f].EEdge
 
-    if lastEdge != EmptyEdge {
+    // If the voronoi consists of just one refPoint, there is no edge.
+    if edge != EmptyEdge {
 
-        // find last edge of that face.
-        for *lastEdge.ENext != *EmptyEdge {
-            lastEdge = lastEdge.ENext
-        }
+        nextFace := v.edges[v.edges[edge].ETwin].FFace
 
-        nextFace := lastEdge.ETwin.FFace
-
-        // Now lastEdge is either EmptyEdge or the last edge before infinity regarding that face.
-        for *nextFace != *firstFace {
+        for nextFace != f {
             convexHullList = append(convexHullList, nextFace)
-            lastEdge = nextFace.EEdge
-            // find last edge of that face.
-            for *lastEdge.ENext != *EmptyEdge {
-                lastEdge = lastEdge.ENext
-            }
-            nextFace = lastEdge.ETwin.FFace
+
+            nextFace = v.edges[v.edges[v.faces[nextFace].EEdge].ETwin].FFace
         }
     }
 
@@ -74,112 +82,100 @@ func (v Voronoi)ConvexHull() ConvexHull {
 }
 
 // So we can get a pointer of some data structure? What about scope issues?
-func createFace(refPoint Vector, eEdge *HEEdge, closed bool) *HEFace {
-    return &HEFace {
+func (v *Voronoi)createFace(refPoint Vector, eEdge EdgeIndex) FaceIndex {
+    v.faces[v.firstFreeFacePos] = HEFace {
         ReferencePoint: refPoint,
         EEdge:          eEdge,
-        IsClosed:       closed,
     }
+    fmt.Println("face ", v.firstFreeFacePos, " == ", v.faces[v.firstFreeFacePos])
+    v.firstFreeFacePos += 1
+    return v.firstFreeFacePos-1
 }
 
 // So we can get a pointer of some data structure? What about scope issues?
-func createEdge(vOrigin *HEVertex, eTwin, eNext *HEEdge, fFace *HEFace, tmpEdge Edge) *HEEdge {
-    return &HEEdge {
+func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, eNext EdgeIndex, fFace FaceIndex, tmpEdge Edge) EdgeIndex {
+    v.edges[v.firstFreeEdgePos] = HEEdge {
         VOrigin:    vOrigin,
         ETwin:      eTwin,
         ENext:      eNext,
         FFace:      fFace,
         TmpEdge:    tmpEdge,
     }
+    v.firstFreeEdgePos += 1
+    return v.firstFreeEdgePos-1
 }
 
 // So we can get a pointer of some data structure? What about scope issues?
-func createVertex(pos Vector, eLeaving *HEEdge) *HEVertex {
-    return &HEVertex {
+func (v *Voronoi)createVertex(pos Vector, eLeaving EdgeIndex) VertexIndex {
+    v.vertices[v.firstFreeVertexPos] = HEVertex {
         Pos:        pos,
         ELeaving:   eLeaving,
     }
-}
-
-// There can only be 1 or 2 points in the list!!! This HAS to be guaranteed!
-func createTrivialVoronoi(points PointList) Voronoi {
-
-    if len(points) == 1 {
-        // A voronoi diagram with just one reference point is just a loosely defined face.
-        return Voronoi{
-            heVertexList: []*HEVertex{},
-            heEdgeList:   []*HEEdge{},
-            heFaceList:   []*HEFace{createFace(points[0], EmptyEdge, false)},
-        }
-    } else {
-        // Simple voronoi with two reference points.
-        p1 := points[0]
-        p2 := points[1]
-        bisector := PerpendicularBisector(p1, p2)
-
-        edge1 := createEdge(EmptyVertex, EmptyEdge, EmptyEdge, EmptyFace, bisector)
-        edge2 := createEdge(EmptyVertex, edge1, EmptyEdge, EmptyFace, bisector)
-        edge1.ETwin = edge2
-
-        face1 := createFace(p1, edge1, false)
-        face2 := createFace(p2, edge2, false)
-
-        // Set references of the faces.
-        edge1.FFace = face1
-        edge2.FFace = face2
-
-        return Voronoi {
-            heVertexList: []*HEVertex{},
-            heEdgeList:   []*HEEdge{edge1, edge2},
-            heFaceList:   []*HEFace{face1, face2},
-        }
-    }
-
-    fmt.Println("ERROR!")
-    return Voronoi{}
+    v.firstFreeVertexPos += 1
+    return v.firstFreeVertexPos-1
 }
 
 // Calculates the face with the 'best' (y-coord) reference point.
 // Can be used to calculate the lowest or highest point with the appropriate function.
-func (ch ConvexHull) bestPoint(isBetter func(y1, y2 float32) bool) *HEFace {
+func (ch ConvexHull) bestFace(v *Voronoi, isBetter func(y1, y2 float32) bool) FaceIndex {
     bestFace := ch[0]
     for _,face := range ch {
-        if isBetter(face.ReferencePoint.Y, bestFace.ReferencePoint.Y) {
+        if isBetter(v.faces[face].ReferencePoint.Y, v.faces[bestFace].ReferencePoint.Y) {
             bestFace = face
         }
     }
     return bestFace
 }
 
+// Creates a line from the HEEdge. Depeding on its state from the edge or the TmpEdge.
+func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
+    if v.edges[e].VOrigin == EmptyVertex || v.edges[v.edges[e].ETwin].VOrigin == EmptyVertex {
+        if amplified {
+            tmpE := v.edges[e].TmpEdge.Copy()
+            tmpE.Amplify(100.0)
+            return tmpE
+        } else {
+            return v.edges[e].TmpEdge
+        }
+    } else {
+        return Edge {
+            Pos: v.vertices[v.edges[e].VOrigin].Pos,
+            Dir: Sub(v.vertices[v.edges[v.edges[e].ETwin].VOrigin].Pos, v.vertices[v.edges[e].VOrigin].Pos),
+        }
+    }
+}
+
 // Calculates the highest intersection of the given bisector and any edge of the
 // given face. With the restriction, that it can't be 'lastEdge'.
-func calcHighestIntersection(bisector Edge, p *HEFace, lastEdge *HEEdge) (*HEEdge, Vector) {
+func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge EdgeIndex) (EdgeIndex, Vector) {
 
     bisector.Amplify(100.0)
 
     // Try to go one direction. If we can't get all the way around, we go the other
     // direction as well!
-    edge := p.EEdge
-    line := edge.Line(true)
-    bestIntersection := LineIntersection(bisector, line)
+    edge := v.faces[face].EEdge
+
+    // For a voronoi with only one or two faces and no edge...
+    if edge == EmptyEdge {
+        return EmptyEdge, Vector{}
+    }
+
+    firstIntersects, bestIntersection := LineIntersection4(bisector, createLine(v, edge, true))
     bestEdge := edge
-    edge = edge.ENext
+    edge = v.edges[edge].ENext
 
-    // Find be highest/best intersection of the bisector and and edge.
-    for *edge != *EmptyEdge && *edge != *p.EEdge && *edge != *p.EEdge.ETwin {
+    // Find be highest/best intersection of the bisector and edge.
+    for edge != EmptyEdge && edge != v.faces[face].EEdge && edge != v.edges[v.faces[face].EEdge].ETwin {
 
-        line = edge.Line(true)
-        intersection := LineIntersection(bisector, line)
-        if intersection.Y > bestIntersection.Y {
+        intersects, intersection := LineIntersection4(bisector, createLine(v, edge, true))
+        if intersects && (!firstIntersects || (intersection.Y > bestIntersection.Y)) {
+            firstIntersects = true
             bestIntersection = intersection
             bestEdge = edge
         }
     }
 
-    // So
-    //if *bestEdge.FFace == *p {
-    //    bestEdge = bestEdge.ETwin
-    //}
+    fmt.Println("The very best intersection iiiis: ", bestEdge, bestIntersection)
 
     return bestEdge, bestIntersection
 }
@@ -187,29 +183,25 @@ func calcHighestIntersection(bisector Edge, p *HEFace, lastEdge *HEEdge) (*HEEdg
 // Right now, a voronoi diagram is identified by a Vertex.
 // Here two not overlapping voronoi diagrams are merged.
 // They HAVE to be left/right of each other with NO overlapping. This HAS to be guaranteed!
-func mergeVoronoi(left, right Voronoi) Voronoi {
+func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
-    mergedVoronoi := Voronoi {
-        heVertexList: append(left.heVertexList, right.heVertexList...),
-        heEdgeList:   append(left.heEdgeList, right.heEdgeList...),
-        heFaceList:   append(left.heFaceList, right.heFaceList...),
-    }
+    voronoiEntry := left
 
-    h1 := left.ConvexHull()
-    h2 := right.ConvexHull()
+    h1 := v.ConvexHull(left)
+    h2 := v.ConvexHull(right)
 
     isHigher := func(y1, y2 float32) bool {
         return y1 > y2
     }
     // p and q are faces!
-    p := h1.bestPoint(isHigher)
-    q := h2.bestPoint(isHigher)
+    p := h1.bestFace(v, isHigher)
+    q := h2.bestFace(v, isHigher)
 
     isLower := func(y1, y2 float32) bool {
         return y1 < y2
     }
-    h1Down := h1.bestPoint(isLower)
-    h2Down := h2.bestPoint(isLower)
+    h1Down := h1.bestFace(v, isLower)
+    h2Down := h2.bestFace(v, isLower)
 
     // We don't cross the same edge twice!
     lastPEdge := EmptyEdge
@@ -220,110 +212,148 @@ func mergeVoronoi(left, right Voronoi) Voronoi {
     // last vertex we created on that separation line
     lastVertex := EmptyVertex
 
-    bisector := PerpendicularBisector(p.ReferencePoint, q.ReferencePoint)
+    bisector := PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
 
     // As long as we didn't reach the lowest possible tangente, we continue.
-    for *p != *h1Down && *q != *h2Down {
+    for {
+        // Here we break out of the loop, when we reach the very bottom!
+        lastMerge := p == h1Down && q == h2Down
 
-        edgeP, locationP := calcHighestIntersection(bisector, p, lastPEdge)
-        edgeQ, locationQ := calcHighestIntersection(bisector, q, lastQEdge)
+        edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge)
+        edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge)
 
-        // Which intersection point do we take?
-        if locationP.Y > locationQ.Y {
+        fmt.Println("merge", lastMerge, locationP, locationQ, edgeP, edgeQ)
 
-            heVertex := createVertex(locationP, EmptyEdge)
+        switch {
 
-            heEdgeUp := createEdge(heVertex, EmptyEdge, lastUpEdge, p, bisector)
+            // For the case, that we merge two trivial voronois with no edges or
+            // the very last step. Now just create two edges and we're done.
+            case lastMerge || (edgeP == EmptyEdge && edgeQ == EmptyEdge):
+                // lastUpEdge is false. It should be something like: lastPUpEdge!!!
+                heEdgeUp   := v.createEdge(EmptyVertex, EmptyEdge, lastUpEdge, p, bisector)
+                heEdgeDown := v.createEdge(lastVertex,  heEdgeUp,  EmptyEdge,  q, bisector)
+                v.edges[heEdgeUp].ETwin = heEdgeDown
 
-            // We don't know yet, what the next Edge is! So we have to set that later!
-            heEdgeDown := createEdge(lastVertex, heEdgeUp, EmptyEdge, q, bisector)
-            heEdgeUp.ETwin = heEdgeDown
-            heVertex.ELeaving = heEdgeUp
-            lastDownEdge.ENext = heEdgeDown
+                v.faces[p].EEdge = heEdgeUp
 
-            // heEdgeDown could  now be the first edge of face q. But only, if this is the first cut.
-            if *lastDownEdge == *EmptyEdge {
-                q.EEdge = heEdgeDown
-            }
+                // For merging primitive voronois.
+                if edgeP == EmptyEdge && edgeQ == EmptyEdge {
+                    v.faces[q].EEdge = heEdgeDown
+                }
 
-            mergedVoronoi.heVertexList = append(mergedVoronoi.heVertexList, heVertex)
-            mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeUp)
-            mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeDown)
+            // We intersect with an edge of the face p
+            case edgeP != EmptyEdge && ((locationP.Y > locationQ.Y) || edgeQ == EmptyEdge):
+                heVertex := v.createVertex(locationP, EmptyEdge)
+
+                heEdgeUp := v.createEdge(heVertex, EmptyEdge, lastUpEdge, p, bisector)
+
+                // We don't know yet, what the next Edge is! So we have to set that later!
+                heEdgeDown := v.createEdge(lastVertex, heEdgeUp, EmptyEdge, q, bisector)
+                v.edges[heEdgeUp].ETwin = heEdgeDown
+                v.vertices[heVertex].ELeaving = heEdgeUp
+                v.edges[lastDownEdge].ENext = heEdgeDown
+
+                if lastDownEdge != EmptyEdge {
+                    v.edges[lastDownEdge].ENext = heEdgeDown
+                }
+
+                // heEdgeDown could  now be the first edge of face q. But only, if this is the first cut.
+                if lastDownEdge == EmptyEdge {
+                    v.faces[q].EEdge = heEdgeDown
+                }
+
+                lastUpEdge   = heEdgeUp
+                lastDownEdge = heEdgeDown
+                lastVertex   = heVertex
+                lastPEdge    = edgeP
+
+                p = v.edges[v.edges[edgeP].ETwin].FFace
+
+            // We intersect with an edge of the face q
+            case edgeQ != EmptyEdge && ((locationQ.Y > locationP.Y) || edgeP == EmptyEdge):
+                heVertex := v.createVertex(locationQ, EmptyEdge)
+
+                // todo: the next edge is NOT lastUpEdge... Only sometimes... shit.
+                heEdgeUp := v.createEdge(heVertex, EmptyEdge, lastUpEdge, p, bisector)
+
+                // Next edge is always edgeQ!!! Has to be!
+                heEdgeDown := v.createEdge(lastVertex, heEdgeUp, edgeQ, q, bisector)
+                v.edges[heEdgeUp].ETwin = heEdgeDown
+                v.vertices[heVertex].ELeaving = heEdgeUp
+
+                if lastDownEdge != EmptyEdge {
+                    v.edges[lastDownEdge].ENext = heEdgeDown
+                } else {
+                    // heEdgeDown could  now be the first edge of face q. But only, if this is the first cut.
+                    v.faces[q].EEdge = heEdgeDown
+                    voronoiEntry = VoronoiEntryFace(q)
+                }
+
+                // If p was a single face without edges
+                if v.faces[p].EEdge == EmptyEdge {
+                    v.faces[p].EEdge = heEdgeUp
+                }
+
+                v.edges[edgeQ].VOrigin = heVertex
+
+                v.edges[heEdgeDown].ENext = edgeQ
 
 
-            lastUpEdge   = heEdgeUp
-            lastDownEdge = heEdgeDown
-            lastVertex   = heVertex
-            lastPEdge    = edgeP
+                lastUpEdge   = heEdgeUp
+                lastDownEdge = v.edges[edgeQ].ETwin
+                lastVertex   = heVertex
+                lastQEdge    = edgeQ
 
-            p = edgeP.ETwin.FFace
-
-        } else {
-
-            heVertex := createVertex(locationQ, EmptyEdge)
-
-            // todo: the next edge is NOT lastUpEdge... Only sometimes... shit.
-            heEdgeUp := createEdge(heVertex, EmptyEdge, lastUpEdge, p, bisector)
-
-            // We don't know yet, what the next Edge is! So we have to set that later!
-            // Shit. Next edge is also not the next edge every time...
-            heEdgeDown := createEdge(lastVertex, heEdgeUp, EmptyEdge, q, bisector)
-            heEdgeUp.ETwin = heEdgeDown
-            heVertex.ELeaving = heEdgeUp
-            lastDownEdge.ENext = heEdgeDown
-
-            // heEdgeDown could  now be the first edge of face q. But only, if this is the first cut.
-            if *lastDownEdge == *EmptyEdge {
-                q.EEdge = heEdgeDown
-            }
-
-            mergedVoronoi.heVertexList = append(mergedVoronoi.heVertexList, heVertex)
-            mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeUp)
-            mergedVoronoi.heEdgeList = append(mergedVoronoi.heEdgeList, heEdgeDown)
-
-
-            lastUpEdge   = heEdgeUp
-            lastDownEdge = heEdgeDown
-            lastVertex   = heVertex
-            lastPEdge    = edgeP
-
-            p = edgeP.ETwin.FFace
-
-
-            // Do something with the voronoi...
-            q = edgeQ.ETwin.FFace
-            //lastEdge = edgeQ
+                q = v.edges[v.edges[edgeQ].ETwin].FFace
         }
-        bisector = PerpendicularBisector(p.ReferencePoint, q.ReferencePoint)
+
+        bisector = PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
+
+        if lastMerge {
+            break
+        }
     }
 
-    // Combine the datasets. They should be connected now anyway.
-    return mergedVoronoi
+    return voronoiEntry
 }
 
 // Voronoi divide and conquer entry point
-func divideAndConquer(points PointList) Voronoi {
-
+func (v *Voronoi)divideAndConquer(points PointList) VoronoiEntryFace {
     l := len(points)
-    // Recursion break on two points (what about 1 vs 3?)
-    if l <= 2 {
-        return createTrivialVoronoi(points)
+
+    if l == 1 {
+        // This is, by definition, an outer face.
+        return VoronoiEntryFace(v.createFace(points[0], EmptyEdge))
     }
 
-    left  := divideAndConquer(points[:l/2])
-    right := divideAndConquer(points[l/2:])
+    left  := v.divideAndConquer(points[:l/2])
+    right := v.divideAndConquer(points[l/2:])
 
-    return mergeVoronoi(left, right)
-
+    return v.mergeVoronoi(left, right)
 }
 
 // Sorts the points and returns a voronoi tessellation.
 func CreateVoronoi(pointList PointList) Voronoi {
     sort.Sort(pointList)
-    return divideAndConquer(pointList)
+    n := len(pointList)
+
+    // See: http://www.cs.wustl.edu/~pless/546/lectures/L11.html
+    // for the calculations of maximum voronoi object count.
+    v := Voronoi {
+        vertices:           make([]HEVertex, 2*n-5 + 3),
+        firstFreeVertexPos: 0,
+        edges:              make([]HEEdge, 2*(3*n-6) + 6),
+        firstFreeEdgePos:   0,
+        faces:              make([]HEFace, n),
+        firstFreeFacePos:   0,
+    }
+
+    v.divideAndConquer(pointList)
+
+    return v
 }
 
-func draw(v Voronoi) {
+func (v Voronoi)draw() {
 
 }
 
@@ -331,13 +361,18 @@ func main() {
     var r = rand.New(rand.NewSource(0))
     var pointList PointList
 
-    for i:=0; i < 10; i++ {
+    for i:=0; i < 0; i++ {
         pointList = append(pointList, Vector{r.Float32()*500., r.Float32()*500., 0})
     }
 
-    var voronoi = CreateVoronoi(pointList)
+    pointList = append(pointList, Vector{0,0,0})
+    pointList = append(pointList, Vector{10,0,0})
 
-    voronoi.pprint()
+    pointList = append(pointList, Vector{5,5,0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
 }
 
 
