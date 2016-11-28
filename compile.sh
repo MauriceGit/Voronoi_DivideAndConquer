@@ -17,7 +17,7 @@ echo "Get Libaries"
 #go get "github.com/go-gl/glfw/v3.2/glfw"
 #go get "github.com/go-gl/mathgl/mgl32"
 #go get "github.com/fogleman/ln/ln"
-go get "github.com/paulmach/go.geo"
+go get "github.com/llgcode/draw2d/draw2dimg"
 
 echo "Build Task"
 go install Voronoi

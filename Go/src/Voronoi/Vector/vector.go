@@ -2,6 +2,7 @@ package vector
 
 import (
     "fmt"
+    "math"
     "github.com/paulmach/go.geo"
 )
 
@@ -38,6 +39,11 @@ func (e Edge) Copy() Edge {
     return Edge{Pos: e.Pos.Copy(), Dir: e.Dir.Copy()}
 }
 
+func Equal(v1, v2 Vector) bool {
+    return  math.Abs(float64(v1.X-v2.X)) <= 0.00001 &&
+            math.Abs(float64(v1.Y-v2.Y)) <= 0.00001 &&
+            math.Abs(float64(v1.Z-v2.Z)) <= 0.00001
+}
 
 func Add(v1, v2 Vector) Vector {
     return Vector{X: v1.X+v2.X, Y: v1.Y+v2.Y, Z: v1.Z+v2.Z}
@@ -241,7 +247,7 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
     s2 := (e2E.X-e2.Pos.X) * (e2.Pos.Y-e1.Pos.Y) - (e2E.Y-e2.Pos.Y) * (e2.Pos.X-e1.Pos.X)
 
     if det <= 0.0000001 && det >= -0.0000001 {
-        fmt.Println("It says - All bets are off. What are we doing now?")
+        //fmt.Println("It says - All bets are off. What are we doing now?")
         // collinear, all bets are off
         if s1 == 0 && s2 == 0 {
             fmt.Println(".... So maybe infinity? Hmpf")
@@ -254,7 +260,7 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
     }
 
     if s1/det < 0 || s1/det > 1 || s2/det < 0 || s2/det > 1 {
-        fmt.Println("I think, there is an intersection. But not within the edges given...")
+        //fmt.Println("I think, there is an intersection. But not within the edges given...")
         return false, Vector{}
     }
 
