@@ -155,7 +155,8 @@ func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
 // given face. With the restriction, that it can't be 'lastEdge'.
 func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge EdgeIndex, lastVertex VertexIndex) (EdgeIndex, Vector) {
 
-    bisector.Amplify(500.0)
+    //bisector.Amplify(500.0)
+    bisector = Amplify(bisector, 50.0)
 
     lastV := lastVertex != EmptyVertex
     lastY := float32(0.0)
@@ -243,7 +244,8 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     lastVertex := EmptyVertex
 
     bisector := PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
-    bisector.Amplify(500.0)
+    bisector = Amplify(bisector, 50.0)
+    //bisector.Amplify(500.0)
 
     fmt.Println("bisector: ", bisector)
 
@@ -263,8 +265,10 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             // the very last step. Now just create two edges and we're done.
             case lastMerge || (edgeP == EmptyEdge && edgeQ == EmptyEdge):
                 fmt.Println("--> primitiv or last merge.")
-                // nextPEdge is false. It should be something like: lastPUpEdge!!!
-                heEdgeUp   := v.createEdge(EmptyVertex, EmptyEdge, nextPEdge, p, bisector)
+
+                otherWayBisector := bisector
+                otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+                heEdgeUp   := v.createEdge(EmptyVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
                 heEdgeDown := v.createEdge(lastVertex,  heEdgeUp,  EmptyEdge,  q, bisector)
                 v.edges[heEdgeUp].ETwin = heEdgeDown
 
@@ -278,16 +282,20 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 if v.faces[q].EEdge == EmptyEdge {
                     v.faces[q].EEdge = heEdgeDown
                 }
-                lastMerge = true
+                //lastMerge = true
 
             // We intersect with an edge of the face p
             case edgeP != EmptyEdge && ((locationP.Y >= locationQ.Y) || edgeQ == EmptyEdge):
                 fmt.Println("--> intersection with p")
                 heVertex := v.createVertex(locationP, EmptyEdge)
 
-                heEdgeUp := v.createEdge(heVertex, EmptyEdge, nextPEdge, p, bisector)
+                if v.edges[v.edges[edgeP].ETwin].VOrigin != EmptyVertex {
+                    fmt.Println("============ FOUND THAT SHIT")
+                }
 
-                // We don't know yet, what the next Edge is! So we have to set that later!
+                otherWayBisector := bisector
+                otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+                heEdgeUp := v.createEdge(heVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
                 heEdgeDown := v.createEdge(lastVertex, heEdgeUp, EmptyEdge, q, bisector)
                 v.edges[heEdgeUp].ETwin = heEdgeDown
                 v.vertices[heVertex].ELeaving = heEdgeUp
@@ -326,9 +334,13 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 fmt.Println("--> intersection with q")
                 heVertex := v.createVertex(locationQ, EmptyEdge)
 
-                heEdgeUp := v.createEdge(heVertex, EmptyEdge, nextPEdge, p, bisector)
+                if v.edges[edgeQ].VOrigin != EmptyVertex {
+                    fmt.Println("============ FOUND THAT SHIT Q")
+                }
 
-                // Next edge is always edgeQ!!! Has to be!
+                otherWayBisector := bisector
+                otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+                heEdgeUp := v.createEdge(heVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
                 heEdgeDown := v.createEdge(lastVertex, heEdgeUp, edgeQ, q, bisector)
                 v.edges[heEdgeUp].ETwin = heEdgeDown
                 v.vertices[heVertex].ELeaving = heEdgeUp
@@ -357,7 +369,8 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         }
 
         bisector = PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
-        bisector.Amplify(500.0)
+        bisector = Amplify(bisector, 50.0)
+        //bisector.Amplify(500.0)
 
         if lastMerge {
             break
@@ -412,39 +425,82 @@ type Circle struct {
     X, Y, R float64
 }
 
-func (c *Circle) Brightness(x, y float64) uint8 {
+func (c *Circle) insideCircle(x, y float64) bool {
     var dx, dy float64 = c.X - x, c.Y - y
     d := math.Sqrt(dx*dx+dy*dy) / c.R
-    if d > 1 {
-        return 0
-    } else {
-        return 255
-    }
+    return d <= 1
 }
 
-func drawCircle(posX, posY, radius float64) {
-    var w, h int = 1000, 1000
-    hw, hh := posX, posY
-    cr := &Circle{hw, hh, radius}
-    //cg := &Circle{hw - radius*math.Sin(θ), hh - radius*math.Cos(θ), radius}
-    //cb := &Circle{hw - radius*math.Sin(-θ), hh - radius*math.Cos(-θ), radius}
+func drawCircle(m *image.RGBA, posX, posY, radius int, c color.RGBA) {
+    cr := &Circle{float64(posX), float64(posY), float64(radius)}
 
-    m := image.NewRGBA(image.Rect(0, 0, w, h))
-    for x := 0; x < w; x++ {
-        for y := 0; y < h; y++ {
-            c := color.RGBA{
-                cr.Brightness(float64(x), float64(y)),
-                cr.Brightness(float64(x), float64(y)),
-                cr.Brightness(float64(x), float64(y)),
-                255,
-            }
-            if cr.Brightness(float64(x), float64(y)) > 0 {
+    for x := posX-radius; x < posX+radius; x++ {
+        for y := posY-radius; y < posY+radius; y++ {
+            if cr.insideCircle(float64(x), float64(y)) {
                 m.Set(x, y, c)
             }
         }
     }
+}
 
-    f, err := os.OpenFile("rgb.png", os.O_WRONLY|os.O_CREATE, 0600)
+func (v *Voronoi)createImage() {
+    var w, h int = 1000, 1000
+
+    m := image.NewRGBA(image.Rect(0, 0, w, h))
+
+    // Edges
+    c := color.RGBA{0,0,255,255}
+    gc := draw2dimg.NewGraphicContext(m)
+    gc.SetStrokeColor(c)
+    gc.SetLineWidth(3)
+    for i,e := range v.edges {
+        var tmp HEEdge
+        if e != tmp {
+            edge := Edge{}
+            v1 := e.VOrigin
+            v2 := v.edges[e.ETwin].VOrigin
+            switch {
+                // Best case. We have both endpoints.
+                case v1 != EmptyVertex && v2 != EmptyVertex:
+                    edge = Edge{v.vertices[v1].Pos, Sub(v.vertices[v1].Pos, v.vertices[v2].Pos)}
+
+                // We have the "left" endpoint.
+                case v1 != EmptyVertex && v2 == EmptyVertex:
+                    edge = Edge{v.vertices[v1].Pos, e.TmpEdge.Dir}
+
+                // We have the "right" endpoint.
+                case v1 == EmptyVertex && v2 != EmptyVertex:
+                    edge = Edge{v.vertices[v2].Pos, v.edges[e.ETwin].TmpEdge.Dir}
+
+                // We don't have any endpoints.
+                case v1 == EmptyVertex && v2 == EmptyVertex:
+                    // amplified line. Exceeding all boundaries. Infinite line.
+                    edge = createLine(v, EdgeIndex(i), false)
+            }
+
+            gc.MoveTo(float64(edge.Pos.X*10), float64(h)-float64(edge.Pos.Y*10))
+            gc.LineTo(float64(Add(edge.Pos, edge.Dir).X*10), float64(h)-float64(Add(edge.Pos, edge.Dir).Y*10))
+            gc.FillStroke()
+            gc.Close()
+        }
+    }
+
+    // Faces/Reference Points!
+    c = color.RGBA{255,0,0,255}
+    for _,f := range v.faces {
+        drawCircle(m, int(f.ReferencePoint.X*10), h-int(f.ReferencePoint.Y*10), 5, c)
+    }
+
+    // Vertices between edges
+    c = color.RGBA{0,255,0,255}
+    for _,ve := range v.vertices {
+        var tmp HEVertex
+        if ve != tmp {
+            drawCircle(m, int(ve.Pos.X*10), h-int(ve.Pos.Y*10), 5, c)
+        }
+    }
+
+    f, err := os.OpenFile("voronoi.png", os.O_WRONLY|os.O_CREATE, 0600)
     if err != nil {
         fmt.Println(err)
         return
@@ -453,96 +509,67 @@ func drawCircle(posX, posY, radius float64) {
     png.Encode(f, m)
 }
 
-func draw(pointList PointList) {
-    // Initialize the graphic context on an RGBA image
-    dest := image.NewRGBA(image.Rect(0, 0, 500, 500.0))
-    gc := draw2dimg.NewGraphicContext(dest)
-
-    // Set some properties
-    gc.SetFillColor(color.RGBA{0x44, 0xff, 0x44, 0xff})
-    gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
-    gc.SetLineWidth(5)
-
-    for _,p := range pointList {
-
-        p = p
-        //gc.Set(2, 3, color.RGBA{255, 0, 0, 255})
-
-    }
-
-    // Save to file
-    draw2dimg.SaveToPngFile("hello.png", dest)
-}
-
-func (v *Voronoi) draw() {
-    // Initialize the graphic context on an RGBA image
-    dest := image.NewRGBA(image.Rect(0, 0, 500, 500.0))
-    gc := draw2dimg.NewGraphicContext(dest)
-
-    // Set some properties
-    gc.SetFillColor(color.RGBA{0x44, 0xff, 0x44, 0xff})
-    gc.SetStrokeColor(color.RGBA{0xff, 0x00, 0x00, 0xff})
-    gc.SetLineWidth(5)
-
-    for i,_ := range v.edges {
-        if v.edges[EdgeIndex(i)].VOrigin == EmptyVertex || v.edges[v.edges[EdgeIndex(i)].ETwin].VOrigin == EmptyVertex {
-            continue
-        }
-
-
-
-        line := createLine(v, EdgeIndex(i), false)
-
-        fmt.Println("Test? ", line)
-
-        gc.MoveTo(float64(line.Pos.X*5.), 500-float64(line.Pos.Y*5.))
-        gc.LineTo(float64(Add(line.Pos, line.Dir).X*5.), 500-float64(Add(line.Pos, line.Dir).Y*5.))
-        gc.Close()
-        gc.FillStroke()
-
-    }
-
-    gc.SetStrokeColor(color.RGBA{0xff, 0xff, 0x00, 0xff})
-
-    for _,f := range v.faces {
-
-        gc.MoveTo(float64(f.ReferencePoint.X*5.), 500-float64(f.ReferencePoint.Y*5.))
-        gc.LineTo(float64(f.ReferencePoint.X*5.)+5, 500-float64(f.ReferencePoint.Y*5.)+5)
-        gc.Close()
-        gc.FillStroke()
-    }
-
-    gc.SetStrokeColor(color.RGBA{0x00, 0xff, 0x00, 0xff})
-
-    for _,ve := range v.vertices {
-
-        gc.MoveTo(float64(ve.Pos.X*5.), 500-float64(ve.Pos.Y*5.))
-        gc.LineTo(float64(ve.Pos.X*5.)+5, 500-float64(ve.Pos.Y*5.)+5)
-        gc.Close()
-        gc.FillStroke()
-    }
-
-    // Save to file
-    draw2dimg.SaveToPngFile("voronoi.png", dest)
-}
-
-
 func main() {
 
     var r = rand.New(rand.NewSource(0))
     var pointList PointList
 
-    for i:= 0; i < 10; i++ {
+    for i:= 0; i < 0; i++ {
         pointList = append(pointList, Vector{r.Float32()*100., r.Float32()*100., 0})
     }
 
-    //draw(pointList)
+    // Weird shit happening
+    /*
+    pointList = append(pointList, Vector{10., 15., 0})
+    pointList = append(pointList, Vector{15., 65., 0})
+    pointList = append(pointList, Vector{20., 40., 0})
+    pointList = append(pointList, Vector{40., 5., 0})
+    pointList = append(pointList, Vector{50., 20., 0})
+    pointList = append(pointList, Vector{60., 60., 0})
+    pointList = append(pointList, Vector{70., 70., 0})
+    pointList = append(pointList, Vector{90., 10., 0})
+    */
 
-    //v := CreateVoronoi(pointList)
-    //v.pprint()
-    //v.draw()
 
-    drawCircle(200, 300, 50)
+    // Works fine!
+    /*
+    pointList = append(pointList, Vector{10., 10., 0})
+    pointList = append(pointList, Vector{20., 20., 0})
+    pointList = append(pointList, Vector{30., 10., 0})
+    pointList = append(pointList, Vector{40., 30., 0})
+    pointList = append(pointList, Vector{50., 20., 0})
+    pointList = append(pointList, Vector{25., 40., 0})
+    */
+
+    // Wrong vertices and not sure about how to calculate the actual tessellation myself!
+    /*
+    pointList = append(pointList, Vector{10., 10., 0})
+    pointList = append(pointList, Vector{20., 20., 0})
+    pointList = append(pointList, Vector{30., 10., 0})
+    pointList = append(pointList, Vector{40., 50., 0})
+    */
+
+    // Wrong vertex. Minimum configuration that fails.
+    pointList = append(pointList, Vector{10., 10., 0})
+    pointList = append(pointList, Vector{20., 20., 0})
+    pointList = append(pointList, Vector{30., 10., 0})
+    pointList = append(pointList, Vector{40., 50., 0})
+
+    // Looping infinitly. Problem occurs when the last point is added!
+    /*
+    pointList = append(pointList, Vector{10., 10., 0})
+    pointList = append(pointList, Vector{20., 20., 0})
+    pointList = append(pointList, Vector{30., 10., 0})
+    pointList = append(pointList, Vector{40., 30., 0})
+    pointList = append(pointList, Vector{50., 20., 0})
+    pointList = append(pointList, Vector{25., 40., 0})
+    pointList = append(pointList, Vector{60., 10., 0})
+    */
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    v.createImage()
 
 }
 

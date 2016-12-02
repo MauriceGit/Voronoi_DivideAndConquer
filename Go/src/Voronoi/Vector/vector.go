@@ -30,9 +30,20 @@ func (slice PointList) Swap(i, j int) {
 
 // Just makes the edge a lot bigger according to s.
 func (e *Edge) Amplify(s float32) {
+
+    //e.Dir = Mult(e.Dir,s)
+    //e.Pos = Sub(e.Pos, Mult(e.Dir, 0.5))
+
     e.Dir.Mult(s)
     e.Pos.Sub(e.Dir)
     e.Dir.Mult(2)
+}
+
+func Amplify(e Edge, s float32) Edge {
+    return Edge{
+        Dir: Mult(e.Dir,s),
+        Pos: Add(e.Pos, Mult(e.Dir, -s/2.0)),
+    }
 }
 
 func (e Edge) Copy() Edge {
