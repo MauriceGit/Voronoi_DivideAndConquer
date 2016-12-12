@@ -156,7 +156,7 @@ func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
 func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge EdgeIndex, lastVertex VertexIndex) (EdgeIndex, Vector) {
 
     //bisector.Amplify(500.0)
-    bisector = Amplify(bisector, 50.0)
+    //bisector = Amplify(bisector, 50.0)
 
     lastV := lastVertex != EmptyVertex
     lastY := float32(0.0)
@@ -247,7 +247,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     bisector = Amplify(bisector, 50.0)
     //bisector.Amplify(500.0)
 
-    fmt.Println("bisector: ", bisector)
+    //fmt.Println("bisector: ", bisector)
 
     // As long as we didn't reach the lowest possible tangente, we continue.
     for {
@@ -255,9 +255,13 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         lastMerge := p == h1Down && q == h2Down
 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
-        edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
+        tmpBisector := bisector
+        if lastVertex != EmptyVertex {
+            //tmpBisector.Dir = Mult(tmpBisector.Dir, -1)
+        }
+        edgeQ, locationQ := calcHighestIntersection(v, tmpBisector, q, lastQEdge, lastVertex)
 
-        fmt.Println("merge", lastMerge, locationP, locationQ, edgeP, edgeQ)
+        fmt.Printf("\nmerge -- last: %v, locP: %v, locQ: %v, edgeP: %v, edgeQ: %v \n", lastMerge, locationP, locationQ, edgeP, edgeQ)
 
         switch {
 
@@ -268,6 +272,9 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                 otherWayBisector := bisector
                 otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+
+                fmt.Println("bisector: ", bisector)
+
                 heEdgeUp   := v.createEdge(EmptyVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
                 heEdgeDown := v.createEdge(lastVertex,  heEdgeUp,  EmptyEdge,  q, bisector)
                 v.edges[heEdgeUp].ETwin = heEdgeDown
@@ -294,6 +301,11 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 }
 
                 otherWayBisector := bisector
+                //bisector.Dir = Mult(bisector.Dir, -1)
+                otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+
+                fmt.Println("bisector: ", bisector)
+
                 otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
                 heEdgeUp := v.createEdge(heVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
                 heEdgeDown := v.createEdge(lastVertex, heEdgeUp, EmptyEdge, q, bisector)
@@ -339,7 +351,11 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 }
 
                 otherWayBisector := bisector
-                otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+                bisector.Dir = Mult(bisector.Dir, -1)
+                //otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+
+                fmt.Println("bisector: ", bisector)
+
                 heEdgeUp := v.createEdge(heVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
                 heEdgeDown := v.createEdge(lastVertex, heEdgeUp, edgeQ, q, bisector)
                 v.edges[heEdgeUp].ETwin = heEdgeDown
@@ -369,18 +385,25 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         }
 
         bisector = PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
-        bisector = Amplify(bisector, 50.0)
+        // Bisector starts at the last vertex we created!
+        if lastVertex != EmptyVertex {
+            bisector.Pos = v.vertices[lastVertex].Pos
+        } else {
+            bisector = Amplify(bisector, 50.0)
+        }
+
+        //bisector = Amplify(bisector, 50.0)
         //bisector.Amplify(500.0)
 
         if lastMerge {
             break
         }
 
-        fmt.Println("bisector: ", bisector)
+        //fmt.Println("bisector: ", bisector)
     }
 
 
-    fmt.Printf("FINISHED MERGE OF %v AND %v\n", left, right)
+    fmt.Printf("FINISHED MERGE OF %v AND %v\n\n", left, right)
 
     return voronoiEntry
 }
@@ -533,12 +556,12 @@ func main() {
 
     // Works fine!
     /*
-    pointList = append(pointList, Vector{10., 10., 0})
-    pointList = append(pointList, Vector{20., 20., 0})
-    pointList = append(pointList, Vector{30., 10., 0})
-    pointList = append(pointList, Vector{40., 30., 0})
+    pointList = append(pointList, Vector{40., 10., 0})
     pointList = append(pointList, Vector{50., 20., 0})
-    pointList = append(pointList, Vector{25., 40., 0})
+    pointList = append(pointList, Vector{60., 10., 0})
+    pointList = append(pointList, Vector{70., 30., 0})
+    pointList = append(pointList, Vector{80., 20., 0})
+    pointList = append(pointList, Vector{55., 40., 0})
     */
 
     // Wrong vertices and not sure about how to calculate the actual tessellation myself!
@@ -550,10 +573,18 @@ func main() {
     */
 
     // Wrong vertex. Minimum configuration that fails.
-    pointList = append(pointList, Vector{10., 10., 0})
+    /*pointList = append(pointList, Vector{10., 10., 0})
     pointList = append(pointList, Vector{20., 20., 0})
     pointList = append(pointList, Vector{30., 10., 0})
     pointList = append(pointList, Vector{40., 50., 0})
+    */
+
+    // Wrong vertex. Minimum configuration that fails.
+    pointList = append(pointList, Vector{30., 10., 0})
+    pointList = append(pointList, Vector{40., 20., 0})
+    pointList = append(pointList, Vector{50., 10., 0})
+    pointList = append(pointList, Vector{45., 45., 0})
+
 
     // Looping infinitly. Problem occurs when the last point is added!
     /*

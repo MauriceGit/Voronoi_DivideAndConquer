@@ -196,7 +196,7 @@ func LineIntersection2(e1 Edge, e2 Edge) Vector {
     return Vector{}
 }
 
-func LineIntersection3(e1 Edge, e2 Edge) Vector {
+func LineIntersection3(e1 Edge, e2 Edge) (bool, Vector) {
 
     path := geo.NewPath()
     path.Push(geo.NewPoint(float64(e1.Pos.X), float64(e1.Pos.Y)))
@@ -212,12 +212,12 @@ func LineIntersection3(e1 Edge, e2 Edge) Vector {
 
         for i, _ := range points {
             fmt.Printf("Intersection %d at %v with path segment %d\n", i, points[i], segments[i][0])
-            return Vector{float32(points[i][0]), float32(points[i][1]),0}
+            return true, Vector{float32(points[i][0]), float32(points[i][1]),0}
         }
     }
 
     fmt.Println("What the shit man????????????")
-    return Vector{}
+    return false, Vector{}
 }
 
 /*
@@ -257,8 +257,8 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
     s1 := (e1E.X-e1.Pos.X) * (e2.Pos.Y-e1.Pos.Y) - (e1E.Y-e1.Pos.Y) * (e2.Pos.X-e1.Pos.X)
     s2 := (e2E.X-e2.Pos.X) * (e2.Pos.Y-e1.Pos.Y) - (e2E.Y-e2.Pos.Y) * (e2.Pos.X-e1.Pos.X)
 
-    if det <= 0.0000001 && det >= -0.0000001 {
-        //fmt.Println("It says - All bets are off. What are we doing now?")
+    if det <= 0.00001 && det >= -0.00001 {
+        fmt.Println("It says - All bets are off. What are we doing now?")
         // collinear, all bets are off
         if s1 == 0 && s2 == 0 {
             fmt.Println(".... So maybe infinity? Hmpf")
@@ -271,12 +271,36 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
     }
 
     if s1/det < 0 || s1/det > 1 || s2/det < 0 || s2/det > 1 {
-        //fmt.Println("I think, there is an intersection. But not within the edges given...")
+        fmt.Println("I think, there is an intersection. But not within the edges given...")
         return false, Vector{}
     }
+
+    fmt.Printf("PointOnLine: %v (%v, %v)\n", PointOnLine(e1, Add(e2.Pos, Mult(e2.Dir, s1/det))), e1, Add(e2.Pos, Mult(e2.Dir, s1/det)))
 
     return true, Add(e2.Pos, Mult(e2.Dir, s1/det))
 }
 
+// True, if p lies on l.
+func PointOnLine(l Edge, p Vector) bool {
 
+    p1 := l.Pos
+    p2 := Add(l.Pos, l.Dir)
+
+    dxl := float64(p2.X - p1.X)
+    dyl := float64(p2.Y - p1.Y)
+
+    if math.Abs(dxl) >= math.Abs(dyl) {
+        if dxl > 0 {
+            return p1.X <= p.X && p.X <= p2.X
+        } else {
+            return p2.X <= p.X && p.X <= p1.X
+        }
+    } else {
+        if dyl > 0 {
+            return p1.Y <= p.Y && p.Y <= p2.Y
+        } else {
+            return p2.Y <= p.Y && p.Y <= p1.Y
+        }
+    }
+}
 
