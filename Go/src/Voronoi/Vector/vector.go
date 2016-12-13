@@ -3,7 +3,7 @@ package vector
 import (
     "fmt"
     "math"
-    "github.com/paulmach/go.geo"
+    //"github.com/paulmach/go.geo"
 )
 
 // Because of laziness, a Vector could also just be a point. Depending on context.
@@ -130,6 +130,18 @@ func Det2D(v1, v2 Vector) float32 {
     return v1.X*v2.Y - v1.Y*v2.X
 }
 
+func sideOfLine(v1, v2, test Vector) float32 {
+    return (v2.X - v1.X) * (test.Y - v1.Y) - (v2.Y - v1.Y) * (test.X - v1.X)
+}
+
+// To determine the higher/lower common support lines of the convex hulls.
+func IsLeft2D(v1, v2, test Vector) bool {
+    return sideOfLine(v1, v2, test) > 0
+}
+func IsRight2D(v1, v2, test Vector) bool {
+    return sideOfLine(v1, v2, test) < 0
+}
+
 // Calculates the intersection point of v1 and v2, if it exists.
 // http://stackoverflow.com/questions/20677795/find-the-point-of-intersecting-lines
 func LineIntersection(e1 Edge, e2 Edge) Vector {
@@ -196,6 +208,7 @@ func LineIntersection2(e1 Edge, e2 Edge) Vector {
     return Vector{}
 }
 
+/*
 func LineIntersection3(e1 Edge, e2 Edge) (bool, Vector) {
 
     path := geo.NewPath()
@@ -219,7 +232,7 @@ func LineIntersection3(e1 Edge, e2 Edge) (bool, Vector) {
     fmt.Println("What the shit man????????????")
     return false, Vector{}
 }
-
+*/
 /*
 func (l *Line) Interpolate(percent float64) *Point {
     return &Point{
@@ -274,8 +287,6 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
         fmt.Println("I think, there is an intersection. But not within the edges given...")
         return false, Vector{}
     }
-
-    fmt.Printf("PointOnLine: %v (%v, %v)\n", PointOnLine(e1, Add(e2.Pos, Mult(e2.Dir, s1/det))), e1, Add(e2.Pos, Mult(e2.Dir, s1/det)))
 
     return true, Add(e2.Pos, Mult(e2.Dir, s1/det))
 }

@@ -30,36 +30,137 @@ type Voronoi struct {
     firstFreeFacePos   FaceIndex
 }
 
+////////////////////////////////////////////////////////////////////////
+//  Pretty Print the  Voronoi Attributes
+////////////////////////////////////////////////////////////////////////
 
 func (v *Voronoi) pprint () {
     fmt.Println("Voronoi:")
-    fmt.Printf("   Vertices (%v): ", v.firstFreeVertexPos)
+    fmt.Printf("   Vertices (%v):\n", v.firstFreeVertexPos)
     var dummyV HEVertex
-    for _,ve := range v.vertices {
+    for i,ve := range v.vertices {
         if ve != dummyV {
-            fmt.Printf("%v, ", ve)
+            fmt.Printf("\t%v:\tPos: %v\n", i, ve.Pos)
         }
     }
     fmt.Printf("\n")
 
-    fmt.Printf("   Edges    (%v): ", v.firstFreeEdgePos)
+    fmt.Printf("   Edges    (%v):\n", v.firstFreeEdgePos)
     var dummyE HEEdge
-    for _,e := range v.edges {
+    for i,e := range v.edges {
         if e != dummyE {
-            fmt.Printf("%v, ", e)
+            fmt.Printf("\t%v:\tOrigin: %v,\tTwin: %v,\tNext: %v,\tFace: %v\n", i, e.VOrigin, e.ETwin, e.ENext, e.FFace)
         }
     }
     fmt.Printf("\n")
 
-    fmt.Printf("   Faces    (%v): ", v.firstFreeFacePos)
+    fmt.Printf("   Faces    (%v):\n", v.firstFreeFacePos)
     var dummyF HEFace
-    for _,f := range v.faces {
+    for i,f := range v.faces {
         if f != dummyF {
-            fmt.Printf("%v, ", f)
+            fmt.Printf("\t%v:\tRefPoint: %v,\tEdge:%v\n", i, f.ReferencePoint, f.EEdge)
         }
     }
     fmt.Printf("\n")
 }
+
+////////////////////////////////////////////////////////////////////////
+//  Draw an Image of the Voronoi Tessellation
+////////////////////////////////////////////////////////////////////////
+
+type Circle struct {
+    X, Y, R float64
+}
+
+func (c *Circle) insideCircle(x, y float64) bool {
+    var dx, dy float64 = c.X - x, c.Y - y
+    d := math.Sqrt(dx*dx+dy*dy) / c.R
+    return d <= 1
+}
+
+func drawCircle(m *image.RGBA, posX, posY, radius int, c color.RGBA) {
+    cr := &Circle{float64(posX), float64(posY), float64(radius)}
+
+    for x := posX-radius; x < posX+radius; x++ {
+        for y := posY-radius; y < posY+radius; y++ {
+            if cr.insideCircle(float64(x), float64(y)) {
+                m.Set(x, y, c)
+            }
+        }
+    }
+}
+
+func (v *Voronoi)createImage() {
+    var w, h int = 1000, 1000
+
+    m := image.NewRGBA(image.Rect(0, 0, w, h))
+
+    // Edges
+    c := color.RGBA{0,0,255,255}
+    gc := draw2dimg.NewGraphicContext(m)
+    gc.SetStrokeColor(c)
+    gc.SetLineWidth(3)
+    for i,e := range v.edges {
+        var tmp HEEdge
+        if e != tmp {
+            e2 := v.edges[e.ETwin]
+            edge := Edge{}
+            v1 := e.VOrigin
+            v2 := e2.VOrigin
+            switch {
+                // Best case. We have both endpoints.
+                case v1 != EmptyVertex && v2 != EmptyVertex:
+                    edge = Edge{v.vertices[v1].Pos, Sub(v.vertices[v1].Pos, v.vertices[v2].Pos)}
+
+                // We have the "left" endpoint.
+                case v1 != EmptyVertex && v2 == EmptyVertex:
+                    edge = Edge{v.vertices[v1].Pos, e.TmpEdge.Dir}
+
+                // We have the "right" endpoint.
+                case v1 == EmptyVertex && v2 != EmptyVertex:
+                    edge = Edge{v.vertices[v2].Pos, e2.TmpEdge.Dir}
+
+                // We don't have any endpoints.
+                case v1 == EmptyVertex && v2 == EmptyVertex:
+                    // amplified line. Exceeding all boundaries. Infinite line.
+                    edge = createLine(v, EdgeIndex(i), false)
+            }
+
+            gc.MoveTo(float64(edge.Pos.X*10), float64(h)-float64(edge.Pos.Y*10))
+            gc.LineTo(float64(Add(edge.Pos, edge.Dir).X*10), float64(h)-float64(Add(edge.Pos, edge.Dir).Y*10))
+            gc.FillStroke()
+            gc.Close()
+        }
+    }
+
+    // Faces/Reference Points!
+    c = color.RGBA{255,0,0,255}
+    for _,f := range v.faces {
+        drawCircle(m, int(f.ReferencePoint.X*10), h-int(f.ReferencePoint.Y*10), 5, c)
+    }
+
+    // Vertices between edges
+    c = color.RGBA{0,255,0,255}
+    for _,ve := range v.vertices {
+        var tmp HEVertex
+        if ve != tmp {
+            drawCircle(m, int(ve.Pos.X*10), h-int(ve.Pos.Y*10), 5, c)
+        }
+    }
+
+    f, err := os.OpenFile("voronoi.png", os.O_WRONLY|os.O_CREATE, 0600)
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    defer f.Close()
+    png.Encode(f, m)
+}
+
+////////////////////////////////////////////////////////////////////////
+//  Calculate a Voronoi Tessellation
+////////////////////////////////////////////////////////////////////////
+
 
 // Calculates a convex hull for the given voronoi. Runs in O(n).
 // The convex hull consists of a list of Reference points.
@@ -112,10 +213,9 @@ func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, eNext EdgeIndex, fFace F
 }
 
 // So we can get a pointer of some data structure? What about scope issues?
-func (v *Voronoi)createVertex(pos Vector, eLeaving EdgeIndex) VertexIndex {
+func (v *Voronoi)createVertex(pos Vector) VertexIndex {
     v.vertices[v.firstFreeVertexPos] = HEVertex {
         Pos:        pos,
-        ELeaving:   eLeaving,
     }
     v.firstFreeVertexPos += 1
     return v.firstFreeVertexPos-1
@@ -123,11 +223,11 @@ func (v *Voronoi)createVertex(pos Vector, eLeaving EdgeIndex) VertexIndex {
 
 // Calculates the face with the 'best' (y-coord) reference point.
 // Can be used to calculate the lowest or highest point with the appropriate function.
-func (ch ConvexHull) bestFace(v *Voronoi, isBetter func(y1, y2 float32) bool) FaceIndex {
-    bestFace := ch[0]
-    for _,face := range ch {
-        if isBetter(v.faces[face].ReferencePoint.Y, v.faces[bestFace].ReferencePoint.Y) {
-            bestFace = face
+func (ch ConvexHull) bestFace(v *Voronoi, isBetter func(v1, v2 Vector) bool) int {
+    bestFace := 0
+    for i,face := range ch {
+        if isBetter(v.faces[face].ReferencePoint, v.faces[ch[bestFace]].ReferencePoint) {
+            bestFace = i
         }
     }
     return bestFace
@@ -211,6 +311,58 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
     return bestEdge, bestIntersection
 }
 
+func upperCommonSupportLine(v *Voronoi, h1, h2 ConvexHull) (FaceIndex, FaceIndex) {
+    isRight := func(v1, v2 Vector) bool {
+        return v1.X > v2.X
+    }
+
+    ai := h1.bestFace(v, isRight)
+    bi := h2.bestFace(v, isRight)
+
+    finished := false
+
+    for !finished {
+        finished = true
+        // iterating through the convex hull points...
+        for IsLeft2D(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h1[(ai+1)%len(h1)]].ReferencePoint) {
+            ai = (ai+1)%len(h1)
+            finished = false
+        }
+        // iterating through the convex hull points...
+        for IsLeft2D(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h2[(bi+1)%len(h2)]].ReferencePoint) {
+            bi = (bi+1)%len(h2)
+            finished = false
+        }
+    }
+
+    return h1[ai], h2[bi]
+
+}
+
+func commonSupportLine(v *Voronoi, h1, h2 ConvexHull, betterSide func(v1, v2 Vector) bool, betterPoint func(v1, v2, test Vector) bool) (FaceIndex, FaceIndex) {
+
+    ai := h1.bestFace(v, betterSide)
+    bi := h2.bestFace(v, betterSide)
+
+    finished := false
+
+    for !finished {
+        finished = true
+        // iterating through the convex hull points...
+        for betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h1[(ai+1)%len(h1)]].ReferencePoint) {
+            ai = (ai+1)%len(h1)
+            finished = false
+        }
+        // iterating through the convex hull points...
+        for betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h2[(bi+1)%len(h2)]].ReferencePoint) {
+            bi = (bi+1)%len(h2)
+            finished = false
+        }
+    }
+
+    return h1[ai], h2[bi]
+}
+
 // Right now, a voronoi diagram is identified by a Vertex.
 // Here two not overlapping voronoi diagrams are merged.
 // They HAVE to be left/right of each other with NO overlapping. This HAS to be guaranteed!
@@ -221,18 +373,20 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     h1 := v.ConvexHull(left)
     h2 := v.ConvexHull(right)
 
-    isHigher := func(y1, y2 float32) bool {
-        return y1 > y2
+    isRight := func(v1, v2 Vector) bool {
+        return v1.X > v2.X
     }
-    // p and q are faces!
-    p := h1.bestFace(v, isHigher)
-    q := h2.bestFace(v, isHigher)
+    // Upper common support line!
+    p, q := commonSupportLine(v, h1, h2, isRight, IsLeft2D)
 
-    isLower := func(y1, y2 float32) bool {
-        return y1 < y2
+    isLeft := func(v1, v2 Vector) bool {
+        return v1.X < v2.X
     }
-    h1Down := h1.bestFace(v, isLower)
-    h2Down := h2.bestFace(v, isLower)
+    // Lower common support line!
+    h1Down, h2Down := commonSupportLine(v,  h1, h2, isLeft, IsRight2D)
+
+    fmt.Printf("Upper common support line: %v, %v\n", v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
+    fmt.Printf("Lower common support line: %v, %v\n", v.faces[h1Down].ReferencePoint, v.faces[h2Down].ReferencePoint)
 
     // We don't cross the same edge twice!
     lastPEdge := EmptyEdge
@@ -255,11 +409,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         lastMerge := p == h1Down && q == h2Down
 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
-        tmpBisector := bisector
-        if lastVertex != EmptyVertex {
-            //tmpBisector.Dir = Mult(tmpBisector.Dir, -1)
-        }
-        edgeQ, locationQ := calcHighestIntersection(v, tmpBisector, q, lastQEdge, lastVertex)
+        edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
 
         fmt.Printf("\nmerge -- last: %v, locP: %v, locQ: %v, edgeP: %v, edgeQ: %v \n", lastMerge, locationP, locationQ, edgeP, edgeQ)
 
@@ -292,12 +442,16 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 //lastMerge = true
 
             // We intersect with an edge of the face p
-            case edgeP != EmptyEdge && ((locationP.Y >= locationQ.Y) || edgeQ == EmptyEdge):
+            case edgeP != EmptyEdge && (locationP.Y >= locationQ.Y || edgeQ == EmptyEdge):
                 fmt.Println("--> intersection with p")
-                heVertex := v.createVertex(locationP, EmptyEdge)
+                heVertex := v.createVertex(locationP)
 
                 if v.edges[v.edges[edgeP].ETwin].VOrigin != EmptyVertex {
-                    fmt.Println("============ FOUND THAT SHIT")
+                    fmt.Println("============ FOUND THAT SHIT P")
+                }
+
+                if v.edges[edgeP].FFace != p {
+                    fmt.Println("============ ASSERTION. WRONG P")
                 }
 
                 otherWayBisector := bisector
@@ -306,11 +460,9 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                 fmt.Println("bisector: ", bisector)
 
-                otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
                 heEdgeUp := v.createEdge(heVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
                 heEdgeDown := v.createEdge(lastVertex, heEdgeUp, EmptyEdge, q, bisector)
                 v.edges[heEdgeUp].ETwin = heEdgeDown
-                v.vertices[heVertex].ELeaving = heEdgeUp
 
                 v.edges[edgeP].ENext = heEdgeUp
                 v.edges[v.edges[edgeP].ETwin].VOrigin = heVertex
@@ -328,6 +480,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 lastDownEdge = heEdgeDown
                 lastVertex   = heVertex
                 lastPEdge    = edgeP
+                lastQEdge    = EmptyEdge
 
                 p = v.edges[v.edges[edgeP].ETwin].FFace
 
@@ -335,6 +488,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 // This could relat in kind of invalid Delaunay triangulations. At least regarding a triangle.
                 // This should now work for situations, where 4 edges meet. I have to re-examine for even more edges meeting...
                 if edgeQ != EmptyEdge && Equal(locationP, locationQ) {
+                    fmt.Println("=========== Special case. More than three edges meet.")
                     v.edges[heEdgeDown].ENext = edgeQ
                     v.edges[edgeQ].VOrigin = heVertex
                     lastDownEdge = v.edges[edgeQ].ETwin
@@ -344,22 +498,25 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             // We intersect with an edge of the face q
             case edgeQ != EmptyEdge && ((locationQ.Y >= locationP.Y) || edgeP == EmptyEdge):
                 fmt.Println("--> intersection with q")
-                heVertex := v.createVertex(locationQ, EmptyEdge)
+                heVertex := v.createVertex(locationQ)
 
                 if v.edges[edgeQ].VOrigin != EmptyVertex {
                     fmt.Println("============ FOUND THAT SHIT Q")
                 }
 
+                if v.edges[edgeQ].FFace != q {
+                    fmt.Println("============ ASSERTION. WRONG Q")
+                }
+
                 otherWayBisector := bisector
-                bisector.Dir = Mult(bisector.Dir, -1)
-                //otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+                //bisector.Dir = Mult(bisector.Dir, -1)
+                otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
 
                 fmt.Println("bisector: ", bisector)
 
                 heEdgeUp := v.createEdge(heVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
                 heEdgeDown := v.createEdge(lastVertex, heEdgeUp, edgeQ, q, bisector)
                 v.edges[heEdgeUp].ETwin = heEdgeDown
-                v.vertices[heVertex].ELeaving = heEdgeUp
 
                 if lastDownEdge != EmptyEdge {
                     v.edges[lastDownEdge].ENext = heEdgeDown
@@ -380,26 +537,18 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 lastDownEdge = v.edges[edgeQ].ETwin
                 lastVertex   = heVertex
                 lastQEdge    = edgeQ
+                lastPEdge    = EmptyEdge
 
                 q = v.edges[v.edges[edgeQ].ETwin].FFace
         }
 
         bisector = PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
-        // Bisector starts at the last vertex we created!
-        if lastVertex != EmptyVertex {
-            bisector.Pos = v.vertices[lastVertex].Pos
-        } else {
-            bisector = Amplify(bisector, 50.0)
-        }
-
-        //bisector = Amplify(bisector, 50.0)
-        //bisector.Amplify(500.0)
+        bisector = Amplify(bisector, 50.0)
 
         if lastMerge {
             break
         }
 
-        //fmt.Println("bisector: ", bisector)
     }
 
 
@@ -412,15 +561,13 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 func (v *Voronoi)divideAndConquer(points PointList) VoronoiEntryFace {
     l := len(points)
 
+    // Recursion stops at one point!
     if l == 1 {
-        // This is, by definition, an outer face.
+        // One face without anything else is the most primitive, trivial Voronoi tessellation!
         return VoronoiEntryFace(v.createFace(points[0], EmptyEdge))
     }
 
-    left  := v.divideAndConquer(points[:l/2])
-    right := v.divideAndConquer(points[l/2:])
-
-    return v.mergeVoronoi(left, right)
+    return v.mergeVoronoi(v.divideAndConquer(points[:l/2]), v.divideAndConquer(points[l/2:]))
 }
 
 // Sorts the points and returns a voronoi tessellation.
@@ -444,94 +591,6 @@ func CreateVoronoi(pointList PointList) Voronoi {
     return v
 }
 
-type Circle struct {
-    X, Y, R float64
-}
-
-func (c *Circle) insideCircle(x, y float64) bool {
-    var dx, dy float64 = c.X - x, c.Y - y
-    d := math.Sqrt(dx*dx+dy*dy) / c.R
-    return d <= 1
-}
-
-func drawCircle(m *image.RGBA, posX, posY, radius int, c color.RGBA) {
-    cr := &Circle{float64(posX), float64(posY), float64(radius)}
-
-    for x := posX-radius; x < posX+radius; x++ {
-        for y := posY-radius; y < posY+radius; y++ {
-            if cr.insideCircle(float64(x), float64(y)) {
-                m.Set(x, y, c)
-            }
-        }
-    }
-}
-
-func (v *Voronoi)createImage() {
-    var w, h int = 1000, 1000
-
-    m := image.NewRGBA(image.Rect(0, 0, w, h))
-
-    // Edges
-    c := color.RGBA{0,0,255,255}
-    gc := draw2dimg.NewGraphicContext(m)
-    gc.SetStrokeColor(c)
-    gc.SetLineWidth(3)
-    for i,e := range v.edges {
-        var tmp HEEdge
-        if e != tmp {
-            edge := Edge{}
-            v1 := e.VOrigin
-            v2 := v.edges[e.ETwin].VOrigin
-            switch {
-                // Best case. We have both endpoints.
-                case v1 != EmptyVertex && v2 != EmptyVertex:
-                    edge = Edge{v.vertices[v1].Pos, Sub(v.vertices[v1].Pos, v.vertices[v2].Pos)}
-
-                // We have the "left" endpoint.
-                case v1 != EmptyVertex && v2 == EmptyVertex:
-                    edge = Edge{v.vertices[v1].Pos, e.TmpEdge.Dir}
-
-                // We have the "right" endpoint.
-                case v1 == EmptyVertex && v2 != EmptyVertex:
-                    edge = Edge{v.vertices[v2].Pos, v.edges[e.ETwin].TmpEdge.Dir}
-
-                // We don't have any endpoints.
-                case v1 == EmptyVertex && v2 == EmptyVertex:
-                    // amplified line. Exceeding all boundaries. Infinite line.
-                    edge = createLine(v, EdgeIndex(i), false)
-            }
-
-            gc.MoveTo(float64(edge.Pos.X*10), float64(h)-float64(edge.Pos.Y*10))
-            gc.LineTo(float64(Add(edge.Pos, edge.Dir).X*10), float64(h)-float64(Add(edge.Pos, edge.Dir).Y*10))
-            gc.FillStroke()
-            gc.Close()
-        }
-    }
-
-    // Faces/Reference Points!
-    c = color.RGBA{255,0,0,255}
-    for _,f := range v.faces {
-        drawCircle(m, int(f.ReferencePoint.X*10), h-int(f.ReferencePoint.Y*10), 5, c)
-    }
-
-    // Vertices between edges
-    c = color.RGBA{0,255,0,255}
-    for _,ve := range v.vertices {
-        var tmp HEVertex
-        if ve != tmp {
-            drawCircle(m, int(ve.Pos.X*10), h-int(ve.Pos.Y*10), 5, c)
-        }
-    }
-
-    f, err := os.OpenFile("voronoi.png", os.O_WRONLY|os.O_CREATE, 0600)
-    if err != nil {
-        fmt.Println(err)
-        return
-    }
-    defer f.Close()
-    png.Encode(f, m)
-}
-
 func main() {
 
     var r = rand.New(rand.NewSource(0))
@@ -553,18 +612,18 @@ func main() {
     pointList = append(pointList, Vector{90., 10., 0})
     */
 
-
     // Works fine!
-    /*
+
     pointList = append(pointList, Vector{40., 10., 0})
     pointList = append(pointList, Vector{50., 20., 0})
     pointList = append(pointList, Vector{60., 10., 0})
     pointList = append(pointList, Vector{70., 30., 0})
     pointList = append(pointList, Vector{80., 20., 0})
     pointList = append(pointList, Vector{55., 40., 0})
-    */
+
 
     // Wrong vertices and not sure about how to calculate the actual tessellation myself!
+    // HA, Works now!
     /*
     pointList = append(pointList, Vector{10., 10., 0})
     pointList = append(pointList, Vector{20., 20., 0})
@@ -573,18 +632,19 @@ func main() {
     */
 
     // Wrong vertex. Minimum configuration that fails.
-    /*pointList = append(pointList, Vector{10., 10., 0})
-    pointList = append(pointList, Vector{20., 20., 0})
-    pointList = append(pointList, Vector{30., 10., 0})
-    pointList = append(pointList, Vector{40., 50., 0})
+    // Update: Works now!
+    /*pointList = append(pointList, Vector{30., 10., 0})
+    pointList = append(pointList, Vector{40., 20., 0})
+    pointList = append(pointList, Vector{45., 45., 0})
+    pointList = append(pointList, Vector{50., 10., 0})
     */
 
-    // Wrong vertex. Minimum configuration that fails.
+    // Linear dependent points. This is currently a problem!
+    /*
     pointList = append(pointList, Vector{30., 10., 0})
-    pointList = append(pointList, Vector{40., 20., 0})
+    pointList = append(pointList, Vector{40., 10., 0})
     pointList = append(pointList, Vector{50., 10., 0})
-    pointList = append(pointList, Vector{45., 45., 0})
-
+    */
 
     // Looping infinitly. Problem occurs when the last point is added!
     /*

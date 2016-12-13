@@ -27,10 +27,6 @@ var EmptyVertex  = VertexIndex(-1)
 
 type HEVertex struct {
     Pos             Vector
-    // It is possible, several edges leave from this vertex.
-    // Then it points to any one of them, arbitrarily.
-    // This shit doesn't help anyone, does it?
-    ELeaving        EdgeIndex
 }
 
 type HEFace struct {
