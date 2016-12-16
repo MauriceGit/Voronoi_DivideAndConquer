@@ -10,9 +10,10 @@ type EdgeIndex    int
 type FaceIndex    int
 type VertexIndex  int
 
-var EmptyFace    = FaceIndex(-1)
-var EmptyEdge    = EdgeIndex(-1)
-var EmptyVertex  = VertexIndex(-1)
+var EmptyFace      = FaceIndex(-1)
+var EmptyEdge      = EdgeIndex(-1)
+var EmptyVertex    = VertexIndex(-1)
+var InfiniteVertex = VertexIndex(-2)
 
 
 /**

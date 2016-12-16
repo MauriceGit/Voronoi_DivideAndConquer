@@ -6,9 +6,15 @@ import (
     //"github.com/paulmach/go.geo"
 )
 
+const (
+    EPS = 0.00001
+)
+
+var InfinitePoint = Vector{-100000,-100000, -100000}
+
 // Because of laziness, a Vector could also just be a point. Depending on context.
 type Vector struct {
-    X,Y,Z   float32
+    X,Y,Z   float64
 }
 
 type Edge struct {
@@ -29,7 +35,7 @@ func (slice PointList) Swap(i, j int) {
 }
 
 // Just makes the edge a lot bigger according to s.
-func (e *Edge) Amplify(s float32) {
+func (e *Edge) Amplify(s float64) {
 
     //e.Dir = Mult(e.Dir,s)
     //e.Pos = Sub(e.Pos, Mult(e.Dir, 0.5))
@@ -39,7 +45,7 @@ func (e *Edge) Amplify(s float32) {
     e.Dir.Mult(2)
 }
 
-func Amplify(e Edge, s float32) Edge {
+func Amplify(e Edge, s float64) Edge {
     return Edge{
         Dir: Mult(e.Dir,s),
         Pos: Add(e.Pos, Mult(e.Dir, -s/2.0)),
@@ -51,15 +57,15 @@ func (e Edge) Copy() Edge {
 }
 
 func Equal(v1, v2 Vector) bool {
-    return  math.Abs(float64(v1.X-v2.X)) <= 0.00001 &&
-            math.Abs(float64(v1.Y-v2.Y)) <= 0.00001 &&
-            math.Abs(float64(v1.Z-v2.Z)) <= 0.00001
+    return  math.Abs(v1.X-v2.X) <= EPS &&
+            math.Abs(v1.Y-v2.Y) <= EPS &&
+            math.Abs(v1.Z-v2.Z) <= EPS
 }
 
 func Add(v1, v2 Vector) Vector {
     return Vector{X: v1.X+v2.X, Y: v1.Y+v2.Y, Z: v1.Z+v2.Z}
 }
-func Mult(v1 Vector, s float32) Vector {
+func Mult(v1 Vector, s float64) Vector {
     return Vector{X: v1.X*s, Y: v1.Y*s, Z: v1.Z*s}
 }
 func Sub(v1, v2 Vector) Vector {
@@ -82,7 +88,7 @@ func (v *Vector) Sub(v1 Vector) {
     v.Z -= v1.Z
 }
 
-func (v *Vector) Mult(s float32) {
+func (v *Vector) Mult(s float64) {
     v.X *= s
     v.Y *= s
     v.Z *= s
@@ -126,20 +132,20 @@ func PerpendicularBisector(p1, p2 Vector) Edge {
 
 // Determinante of v1 and v2, ignoring the Z-component!
 // Honestly, I don't really know, what this does^^
-func Det2D(v1, v2 Vector) float32 {
+func Det2D(v1, v2 Vector) float64 {
     return v1.X*v2.Y - v1.Y*v2.X
 }
 
-func sideOfLine(v1, v2, test Vector) float32 {
+func SideOfLine(v1, v2, test Vector) float64 {
     return (v2.X - v1.X) * (test.Y - v1.Y) - (v2.Y - v1.Y) * (test.X - v1.X)
 }
 
 // To determine the higher/lower common support lines of the convex hulls.
 func IsLeft2D(v1, v2, test Vector) bool {
-    return sideOfLine(v1, v2, test) > 0
+    return SideOfLine(v1, v2, test) > 0
 }
 func IsRight2D(v1, v2, test Vector) bool {
-    return sideOfLine(v1, v2, test) < 0
+    return SideOfLine(v1, v2, test) < 0
 }
 
 // Calculates the intersection point of v1 and v2, if it exists.
@@ -225,7 +231,7 @@ func LineIntersection3(e1 Edge, e2 Edge) (bool, Vector) {
 
         for i, _ := range points {
             fmt.Printf("Intersection %d at %v with path segment %d\n", i, points[i], segments[i][0])
-            return true, Vector{float32(points[i][0]), float32(points[i][1]),0}
+            return true, Vector{float64(points[i][0]), float64(points[i][1]),0}
         }
     }
 
@@ -270,17 +276,20 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
     s1 := (e1E.X-e1.Pos.X) * (e2.Pos.Y-e1.Pos.Y) - (e1E.Y-e1.Pos.Y) * (e2.Pos.X-e1.Pos.X)
     s2 := (e2E.X-e2.Pos.X) * (e2.Pos.Y-e1.Pos.Y) - (e2E.Y-e2.Pos.Y) * (e2.Pos.X-e1.Pos.X)
 
-    if det <= 0.00001 && det >= -0.00001 {
-        fmt.Println("It says - All bets are off. What are we doing now?")
+    if det <= EPS && det >= -EPS {
+        //fmt.Println("It says - All bets are off. What are we doing now?")
         // collinear, all bets are off
-        if s1 == 0 && s2 == 0 {
+        if s1 <= EPS && s1 >= -EPS && s2 <= EPS && s2 >= -EPS {
+        //if s1 == 0 && s2 == 0 {
             fmt.Println(".... So maybe infinity? Hmpf")
             // Some kind of infinity stuff-Point??
             // I could just say, they intersect in like 1000-distance.
-            return false, Vector{}
+            return true, InfinitePoint
+            //return false, Vector{}
         }
 
-        return false, Vector{}
+        return true, InfinitePoint
+        //return false, Vector{}
     }
 
     if s1/det < 0 || s1/det > 1 || s2/det < 0 || s2/det > 1 {

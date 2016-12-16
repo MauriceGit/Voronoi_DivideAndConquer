@@ -108,20 +108,20 @@ func (v *Voronoi)createImage() {
             v1 := e.VOrigin
             v2 := e2.VOrigin
             switch {
-                // Best case. We have both endpoints.
-                case v1 != EmptyVertex && v2 != EmptyVertex:
+                // Best case. We have both endpoints. And none of them Infinity ones.
+                case v1 != EmptyVertex && v2 != EmptyVertex && v.vertices[v1].Pos != InfinitePoint && v.vertices[v2].Pos != InfinitePoint:
                     edge = Edge{v.vertices[v1].Pos, Sub(v.vertices[v1].Pos, v.vertices[v2].Pos)}
 
                 // We have the "left" endpoint.
-                case v1 != EmptyVertex && v2 == EmptyVertex:
+                case v1 != EmptyVertex && v.vertices[v1].Pos != InfinitePoint && v2 == EmptyVertex:
                     edge = Edge{v.vertices[v1].Pos, e.TmpEdge.Dir}
 
                 // We have the "right" endpoint.
-                case v1 == EmptyVertex && v2 != EmptyVertex:
+                case v1 == EmptyVertex && v2 != EmptyVertex && v.vertices[v2].Pos != InfinitePoint:
                     edge = Edge{v.vertices[v2].Pos, e2.TmpEdge.Dir}
 
                 // We don't have any endpoints.
-                case v1 == EmptyVertex && v2 == EmptyVertex:
+                default:
                     // amplified line. Exceeding all boundaries. Infinite line.
                     edge = createLine(v, EdgeIndex(i), false)
             }
@@ -167,24 +167,50 @@ func (v *Voronoi)createImage() {
 // As there is an exactly 1:1 representation of Reference points and HEFaces,
 // a list of face indices is returned in Order (counter-clockwise) of the convex hull.
 func (v *Voronoi)ConvexHull(fEntry VoronoiEntryFace) ConvexHull {
+    fmt.Println("Convex Hull:")
+    startFace := FaceIndex(fEntry)
+    convexHullList := []FaceIndex{FaceIndex(startFace)}
 
-    f := FaceIndex(fEntry)
-    convexHullList := []FaceIndex{FaceIndex(f)}
-
-    edge := v.faces[f].EEdge
+    finished := false
 
     // If the voronoi consists of just one refPoint, there is no edge.
-    if edge != EmptyEdge {
+    if v.faces[startFace].EEdge != EmptyEdge {
+        lastFace := startFace
+        nextFace := v.edges[v.edges[v.faces[startFace].EEdge].ETwin].FFace
+        //nextEdge := v.edges[v.faces[nextFace].EEdge].ENext
+        convexHullList = append(convexHullList, nextFace)
 
-        nextFace := v.edges[v.edges[edge].ETwin].FFace
-
-        for nextFace != f {
-            convexHullList = append(convexHullList, nextFace)
-
+        for {
+            lastFace = nextFace
             nextFace = v.edges[v.edges[v.faces[nextFace].EEdge].ETwin].FFace
+
+            tmpE := v.edges[v.faces[lastFace].EEdge].ENext
+            fmt.Printf("nextFace: %v\n", nextFace)
+            switch {
+                case nextFace == startFace && tmpE != EmptyEdge && v.edges[v.edges[tmpE].ETwin].FFace != startFace && lastFace == startFace:
+                    // Normally, this would go back to the last face.
+                    // Except, when we have a linear voronoi! If this doesn't go back, we continue this way!!!
+                    fmt.Println("YES")
+                    nextFace = v.edges[v.edges[tmpE].ETwin].FFace
+                case nextFace != startFace && tmpE == EmptyEdge:
+                    fmt.Println("this shit")
+                    // End of linear voronoi. We don't get any further...
+                    finished = true
+                case nextFace == startFace:
+                    fmt.Println("next == start")
+                    // We are finished the normal way.
+                    finished = true
+
+            }
+
+            if finished {
+                break
+            }
+
+            convexHullList = append(convexHullList, nextFace)
         }
     }
-
+    fmt.Println("Convex Hull: Done")
     return convexHullList
 }
 
@@ -255,29 +281,29 @@ func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
 // given face. With the restriction, that it can't be 'lastEdge'.
 func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge EdgeIndex, lastVertex VertexIndex) (EdgeIndex, Vector) {
 
-    //bisector.Amplify(500.0)
-    //bisector = Amplify(bisector, 50.0)
-
     lastV := lastVertex != EmptyVertex
-    lastY := float32(0.0)
+    lastY := 0.0
     if lastV {
         lastY = v.vertices[lastVertex].Pos.Y
     }
 
-    // Try to go one direction. If we can't get all the way around, we go the other
-    // direction as well!
     edge := v.faces[face].EEdge
     veryFirstEdge := edge
 
-    // For a voronoi with only one or two faces and no edge...
+    // For a voronoi with only one face and no edge...
     if edge == EmptyEdge {
         return EmptyEdge, Vector{}
     }
 
     firstIntersects, bestIntersection := LineIntersection4(bisector, createLine(v, edge, true))
-    if firstIntersects && lastV && bestIntersection.Y > lastY {
+    if firstIntersects && lastV && bestIntersection != InfinitePoint && bestIntersection.Y > lastY {
         firstIntersects = false
     }
+
+    if lastVertex != EmptyVertex && firstIntersects && Equal(bestIntersection, v.vertices[lastVertex].Pos) {
+        firstIntersects = false
+    }
+
     bestEdge := edge
     if !firstIntersects {
         bestEdge = EmptyEdge
@@ -294,15 +320,22 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
         if edge != lastEdge && (lastEdge == EmptyEdge || edge != v.edges[lastEdge].ETwin) {
             intersects, intersection := LineIntersection4(bisector, createLine(v, edge, true))
 
+            fmt.Printf("equal: %v, %v --> %v\n", intersection, v.vertices[lastVertex].Pos, Equal(intersection, v.vertices[lastVertex].Pos))
+
             // For an intersection to be considered, it must satisfy the following conditions:
             // - Must intersect!
             // - Must be better, than the best one so far (if there is one)
-            // - Must be below the last Vertex (if there is one!)
-            if intersects && (!firstIntersects || intersection.Y > bestIntersection.Y) && (!lastV || (intersection.Y < lastY)) {
+            // - Must be below the lastVertex (if there is one!)
+            if intersects && (lastVertex == EmptyVertex || !Equal(intersection, v.vertices[lastVertex].Pos)) {
+                // lower than the last vertex if there is one!
+                if (!lastV || (intersection.Y < lastY-EPS)) &&
+                    // higher than the last intersection, if there is one of any one, if the best one is Infinity.
+                    (!firstIntersects || bestIntersection == InfinitePoint || (intersection != InfinitePoint && intersection.Y > bestIntersection.Y)) {
 
-                firstIntersects = true
-                bestIntersection = intersection
-                bestEdge = edge
+                    firstIntersects = true
+                    bestIntersection = intersection
+                    bestEdge = edge
+                }
             }
         }
         edge = v.edges[edge].ENext
@@ -339,6 +372,9 @@ func upperCommonSupportLine(v *Voronoi, h1, h2 ConvexHull) (FaceIndex, FaceIndex
 
 }
 
+// Calculates the upper or lower common support line for the two given convex hulls.
+// Depending on the betterSide and betterPoint-function, it could potentially also calculate
+// left/right common support lines, depending on the divide-and-conquer approach of the main algorithm.
 func commonSupportLine(v *Voronoi, h1, h2 ConvexHull, betterSide func(v1, v2 Vector) bool, betterPoint func(v1, v2, test Vector) bool) (FaceIndex, FaceIndex) {
 
     ai := h1.bestFace(v, betterSide)
@@ -349,12 +385,12 @@ func commonSupportLine(v *Voronoi, h1, h2 ConvexHull, betterSide func(v1, v2 Vec
     for !finished {
         finished = true
         // iterating through the convex hull points...
-        for betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h1[(ai+1)%len(h1)]].ReferencePoint) {
+        for len(h1) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h1[(ai+1)%len(h1)]].ReferencePoint) {
             ai = (ai+1)%len(h1)
             finished = false
         }
         // iterating through the convex hull points...
-        for betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h2[(bi+1)%len(h2)]].ReferencePoint) {
+        for len(h2) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h2[(bi+1)%len(h2)]].ReferencePoint) {
             bi = (bi+1)%len(h2)
             finished = false
         }
@@ -362,13 +398,35 @@ func commonSupportLine(v *Voronoi, h1, h2 ConvexHull, betterSide func(v1, v2 Vec
 
     return h1[ai], h2[bi]
 }
+// Helperfunctions for calculating the common support line.
+// Were anonymous functions, but sourced out because they where getting too long.
+func isBetterUp(v1, v2, test Vector) bool {
+    if IsLeft2D(v1, v2, test) {
+        return true
+    }
+    side := SideOfLine(v1, v2, test)
+    if side <= EPS && side >= -EPS {
+        fmt.Println("ON LINE!")
+        return test.X >= v1.X && test.X <= v2.X
+    }
+    return false
+}
+func isBetterDown(v1, v2, test Vector) bool {
+    if IsRight2D(v1, v2, test) {
+        return true
+    }
+    side := SideOfLine(v1, v2, test)
+    if side <= EPS && side >= -EPS {
+        fmt.Println("ON LINE!")
+        return test.X >= v1.X && test.X <= v2.X
+    }
+    return false
+}
 
 // Right now, a voronoi diagram is identified by a Vertex.
 // Here two not overlapping voronoi diagrams are merged.
 // They HAVE to be left/right of each other with NO overlapping. This HAS to be guaranteed!
 func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
-
-    voronoiEntry := left
 
     h1 := v.ConvexHull(left)
     h2 := v.ConvexHull(right)
@@ -377,16 +435,13 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         return v1.X > v2.X
     }
     // Upper common support line!
-    p, q := commonSupportLine(v, h1, h2, isRight, IsLeft2D)
+    p, q := commonSupportLine(v, h1, h2, isRight, isBetterUp)
 
     isLeft := func(v1, v2 Vector) bool {
-        return v1.X < v2.X
+        return v1.X <= v2.X
     }
     // Lower common support line!
-    h1Down, h2Down := commonSupportLine(v,  h1, h2, isLeft, IsRight2D)
-
-    fmt.Printf("Upper common support line: %v, %v\n", v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
-    fmt.Printf("Lower common support line: %v, %v\n", v.faces[h1Down].ReferencePoint, v.faces[h2Down].ReferencePoint)
+    h1Down, h2Down := commonSupportLine(v,  h1, h2, isLeft, isBetterDown)
 
     // We don't cross the same edge twice!
     lastPEdge := EmptyEdge
@@ -401,7 +456,8 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     bisector = Amplify(bisector, 50.0)
     //bisector.Amplify(500.0)
 
-    //fmt.Println("bisector: ", bisector)
+    fmt.Printf("h1Down: %v, h2Down: %v\n", v.faces[h1Down].ReferencePoint, v.faces[h2Down].ReferencePoint)
+    fmt.Printf("CH-Left: %v, CH-Right: %v (left: %v, right: %v)\n", h1, h2, left, right)
 
     // As long as we didn't reach the lowest possible tangente, we continue.
     for {
@@ -411,14 +467,49 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
         edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
 
-        fmt.Printf("\nmerge -- last: %v, locP: %v, locQ: %v, edgeP: %v, edgeQ: %v \n", lastMerge, locationP, locationQ, edgeP, edgeQ)
+        fmt.Printf("\nmerge -- last: %v, locP: %v, locQ: %v, edgeP: %v, edgeQ: %v, lastVertex: %v \n", lastMerge, locationP, locationQ, edgeP, edgeQ, lastVertex)
 
         switch {
 
+            // Infinite vertex Q
+            case lastMerge && edgeQ != EmptyEdge && locationQ == InfinitePoint:
+                fmt.Println("found Infinity at Q")
+
+                heVertex := v.createVertex(locationQ)
+
+                otherWayBisector := bisector
+                otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+
+                fmt.Println("bisector: ", bisector)
+
+                heEdgeUp   := v.createEdge(heVertex,    EmptyEdge, nextPEdge, p, otherWayBisector)
+                heEdgeDown := v.createEdge(lastVertex,  heEdgeUp,  edgeQ,     q, bisector)
+                v.edges[heEdgeUp].ETwin = heEdgeDown
+
+                v.edges[edgeQ].VOrigin = heVertex
+
+                if v.faces[p].EEdge == EmptyEdge {
+                    v.faces[p].EEdge = heEdgeUp
+                }
+
+                if lastDownEdge != EmptyEdge {
+                    v.edges[lastDownEdge].ENext = heEdgeDown
+                } else {
+                    // heEdgeDown could  now be the first edge of face q. But only, if this is the first cut.
+                    v.faces[q].EEdge = heEdgeDown
+                }
+
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
-            case lastMerge || (edgeP == EmptyEdge && edgeQ == EmptyEdge):
-                fmt.Println("--> primitiv or last merge.")
+            case edgeP == EmptyEdge && edgeQ == EmptyEdge:
+            // Last Merge or we merge primitive voronois or there is no intersection any more (shouldn't and can't happen!!!)
+            //case lastMerge:
+
+                fmt.Println("last merge")
+
+                if edgeP != EmptyEdge && locationP == InfinitePoint {
+                    fmt.Println("found it P")
+                }
 
                 otherWayBisector := bisector
                 otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
@@ -426,32 +517,79 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 fmt.Println("bisector: ", bisector)
 
                 heEdgeUp   := v.createEdge(EmptyVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
-                heEdgeDown := v.createEdge(lastVertex,  heEdgeUp,  EmptyEdge,  q, bisector)
+                heEdgeDown := v.createEdge(lastVertex,  heEdgeUp,  edgeQ,     q, bisector)
                 v.edges[heEdgeUp].ETwin = heEdgeDown
 
                 if lastDownEdge != EmptyEdge {
                     v.edges[lastDownEdge].ENext = heEdgeDown
                 }
 
+                // For merging primitive voronois.
                 v.faces[p].EEdge = heEdgeUp
 
-                // For merging primitive voronois.
                 if v.faces[q].EEdge == EmptyEdge {
                     v.faces[q].EEdge = heEdgeDown
                 }
-                //lastMerge = true
+
+            // Equal Intersection with both edges. So 4 edges meet.
+            case edgeQ != EmptyEdge && edgeP != EmptyEdge && Equal(locationP, locationQ) && (lastVertex == EmptyVertex || !Equal(locationP, v.vertices[lastVertex].Pos)):
+                // This could result in kind of an invalid Delaunay triangulations. At least regarding a triangle.
+                // This should now work for situations, where 4 edges meet. I have to re-examine for even more edges meeting...
+                fmt.Println("=========== Special case. More than three edges meet.")
+
+                heVertex := v.createVertex(locationP)
+                otherWayBisector := bisector
+                otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
+
+                heEdgeUp   := v.createEdge(heVertex,   EmptyEdge, nextPEdge, p, otherWayBisector)
+                heEdgeDown := v.createEdge(lastVertex, heEdgeUp,  edgeQ,     q, bisector)
+                v.edges[heEdgeUp].ETwin = heEdgeDown
+
+                v.edges[edgeP].ENext = heEdgeUp
+                v.edges[v.edges[edgeP].ETwin].VOrigin = heVertex
+
+                if lastDownEdge != EmptyEdge {
+                    v.edges[lastDownEdge].ENext = heEdgeDown
+                }
+
+                v.edges[edgeQ].VOrigin = heVertex
+
+
+                nextPEdge    = v.edges[edgeP].ETwin
+                lastDownEdge = v.edges[edgeQ].ETwin
+                lastVertex   = heVertex
+                lastPEdge    = edgeP
+                lastQEdge    = edgeQ
+
+                p = v.edges[v.edges[edgeP].ETwin].FFace
+                q = v.edges[v.edges[edgeQ].ETwin].FFace
 
             // We intersect with an edge of the face p
-            case edgeP != EmptyEdge && (locationP.Y >= locationQ.Y || edgeQ == EmptyEdge):
+            case edgeP != EmptyEdge && (locationP.Y >= locationQ.Y || edgeQ == EmptyEdge) && (lastVertex == EmptyVertex || !Equal(locationP, v.vertices[lastVertex].Pos)):
                 fmt.Println("--> intersection with p")
                 heVertex := v.createVertex(locationP)
 
-                if v.edges[v.edges[edgeP].ETwin].VOrigin != EmptyVertex {
-                    fmt.Println("============ FOUND THAT SHIT P")
-                }
+                vertex := v.edges[v.edges[edgeP].ETwin].VOrigin
+                if vertex != EmptyVertex {
+                    fmt.Println("----> Found a vertex that has do be deleted (P)")
 
-                if v.edges[edgeP].FFace != p {
-                    fmt.Println("============ ASSERTION. WRONG P")
+                    var emptyV HEVertex
+
+                    // Otherwise, we already deleted that vertex and
+                    // the VOrigin is going to be overwritten anyway.
+                    if v.vertices[vertex] != emptyV {
+                        var emptyE HEEdge
+                        // If we have an infinity-point, there is no edge after that.
+                        if v.vertices[vertex].Pos != InfinitePoint {
+                            // Delete his twin of the following edge of edgeP
+                            v.edges[v.edges[v.edges[edgeP].ENext].ETwin] = emptyE
+                            // Delete the following edge of edgeP
+                            v.edges[v.edges[edgeP].ENext] = emptyE
+                        }
+                        // Delete the vertex.
+                        v.vertices[v.edges[v.edges[edgeP].ETwin].VOrigin] = emptyV
+                    }
+
                 }
 
                 otherWayBisector := bisector
@@ -461,7 +599,9 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 fmt.Println("bisector: ", bisector)
 
                 heEdgeUp := v.createEdge(heVertex, EmptyEdge, nextPEdge, p, otherWayBisector)
-                heEdgeDown := v.createEdge(lastVertex, heEdgeUp, EmptyEdge, q, bisector)
+                // IMPORTANT: by setting v.faces[q].EEdge as the following edge, we create a temporary (wrong) next-edge.
+                // This will be overwritten in the next loop but with this, we don't lose a possible reference to the other edge of q.
+                heEdgeDown := v.createEdge(lastVertex, heEdgeUp, v.faces[q].EEdge, q, bisector)
                 v.edges[heEdgeUp].ETwin = heEdgeDown
 
                 v.edges[edgeP].ENext = heEdgeUp
@@ -471,9 +611,13 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 if lastDownEdge != EmptyEdge {
                     v.edges[lastDownEdge].ENext = heEdgeDown
                 } else {
-                    if v.faces[q].EEdge == EmptyEdge {
+                    //if v.faces[q].EEdge == EmptyEdge {
                         v.faces[q].EEdge = heEdgeDown
-                    }
+                    //}
+                }
+
+                if v.edges[edgeP].VOrigin == EmptyVertex {
+                    v.faces[p].EEdge = edgeP
                 }
 
                 nextPEdge    = v.edges[edgeP].ETwin
@@ -484,28 +628,34 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                 p = v.edges[v.edges[edgeP].ETwin].FFace
 
-                // Special case for situations where more than three edges meet.
-                // This could relat in kind of invalid Delaunay triangulations. At least regarding a triangle.
-                // This should now work for situations, where 4 edges meet. I have to re-examine for even more edges meeting...
-                if edgeQ != EmptyEdge && Equal(locationP, locationQ) {
-                    fmt.Println("=========== Special case. More than three edges meet.")
-                    v.edges[heEdgeDown].ENext = edgeQ
-                    v.edges[edgeQ].VOrigin = heVertex
-                    lastDownEdge = v.edges[edgeQ].ETwin
-                    q = v.edges[v.edges[edgeQ].ETwin].FFace
-                }
-
             // We intersect with an edge of the face q
-            case edgeQ != EmptyEdge && ((locationQ.Y >= locationP.Y) || edgeP == EmptyEdge):
+            case edgeQ != EmptyEdge && ((locationQ.Y >= locationP.Y) || edgeP == EmptyEdge) && (lastVertex == EmptyVertex || !Equal(locationQ, v.vertices[lastVertex].Pos)):
                 fmt.Println("--> intersection with q")
                 heVertex := v.createVertex(locationQ)
 
-                if v.edges[edgeQ].VOrigin != EmptyVertex {
-                    fmt.Println("============ FOUND THAT SHIT Q")
-                }
+                vertex := v.edges[edgeQ].VOrigin
+                if vertex != EmptyVertex {
+                    fmt.Println("----> Found a vertex that has do be deleted (Q) - ", v.vertices[vertex].Pos)
 
-                if v.edges[edgeQ].FFace != q {
-                    fmt.Println("============ ASSERTION. WRONG Q")
+
+                    var emptyV HEVertex
+
+                    // Otherwise, we already deleted that vertex and
+                    // the VOrigin is going to be overwritten anyway.
+                    if v.vertices[vertex] != emptyV {
+                        var emptyE HEEdge
+
+                        // If we have an infinity-point, there is no edge after that.
+                        if v.vertices[vertex].Pos != InfinitePoint {
+                            // We have to get the edge after that vertex and its twin. A bit tricky here...
+                            v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
+
+                            // Delete the other one
+                            v.edges[v.edges[v.edges[v.edges[v.edges[edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
+                        }
+                        // Delete the vertex.
+                        v.vertices[v.edges[edgeQ].VOrigin] = emptyV
+                    }
                 }
 
                 otherWayBisector := bisector
@@ -523,12 +673,12 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 } else {
                     // heEdgeDown could  now be the first edge of face q. But only, if this is the first cut.
                     v.faces[q].EEdge = heEdgeDown
-                    voronoiEntry = VoronoiEntryFace(q)
+                    //voronoiEntry = VoronoiEntryFace(q)
                 }
 
                 // If p was a single face without edges
                 if v.faces[p].EEdge == EmptyEdge {
-                    v.faces[p].EEdge = heEdgeUp
+                    //v.faces[p].EEdge = heEdgeUp
                 }
 
                 v.edges[edgeQ].VOrigin = heVertex
@@ -540,21 +690,21 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 lastPEdge    = EmptyEdge
 
                 q = v.edges[v.edges[edgeQ].ETwin].FFace
-        }
 
-        bisector = PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
-        bisector = Amplify(bisector, 50.0)
+        }
 
         if lastMerge {
             break
         }
 
-    }
+        bisector = PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
+        bisector = Amplify(bisector, 50.0)
 
+    }
 
     fmt.Printf("FINISHED MERGE OF %v AND %v\n\n", left, right)
 
-    return voronoiEntry
+    return left
 }
 
 // Voronoi divide and conquer entry point
@@ -597,10 +747,11 @@ func main() {
     var pointList PointList
 
     for i:= 0; i < 0; i++ {
-        pointList = append(pointList, Vector{r.Float32()*100., r.Float32()*100., 0})
+        pointList = append(pointList, Vector{r.Float64()*100., r.Float64()*100., 0})
     }
 
     // Weird shit happening
+    // Endless loop with the last point removed...
     /*
     pointList = append(pointList, Vector{10., 15., 0})
     pointList = append(pointList, Vector{15., 65., 0})
@@ -612,15 +763,34 @@ func main() {
     pointList = append(pointList, Vector{90., 10., 0})
     */
 
-    // Works fine!
+    // Special case. Intersection with both p and q equally.
+    // Requires special handling!
+    /*
+    pointList = append(pointList, Vector{28, 30, 0})
+    pointList = append(pointList, Vector{30, 20, 0})
+    pointList = append(pointList, Vector{30, 40, 0})
 
+    pointList = append(pointList, Vector{42, 30, 0})
+    pointList = append(pointList, Vector{40, 20, 0})
+    pointList = append(pointList, Vector{40, 40, 0})
+    */
+
+    // Linear dependent minimal points
+    pointList = append(pointList, Vector{20, 10, 0})
+    pointList = append(pointList, Vector{30, 10, 0})
+    pointList = append(pointList, Vector{40, 10, 0})
+    pointList = append(pointList, Vector{50, 10, 0})
+
+
+    // Works fine!
+    /*
     pointList = append(pointList, Vector{40., 10., 0})
     pointList = append(pointList, Vector{50., 20., 0})
     pointList = append(pointList, Vector{60., 10., 0})
     pointList = append(pointList, Vector{70., 30., 0})
     pointList = append(pointList, Vector{80., 20., 0})
     pointList = append(pointList, Vector{55., 40., 0})
-
+    */
 
     // Wrong vertices and not sure about how to calculate the actual tessellation myself!
     // HA, Works now!
@@ -644,21 +814,37 @@ func main() {
     pointList = append(pointList, Vector{30., 10., 0})
     pointList = append(pointList, Vector{40., 10., 0})
     pointList = append(pointList, Vector{50., 10., 0})
+    pointList = append(pointList, Vector{60., 10., 0})
+    pointList = append(pointList, Vector{70., 10., 0})
     */
 
     // Looping infinitly. Problem occurs when the last point is added!
+
+    //pointList = append(pointList, Vector{10., 10., 0})
+    //pointList = append(pointList, Vector{20., 20., 0})
+
+    //pointList = append(pointList, Vector{25., 40., 0})
+
+    //pointList = append(pointList, Vector{30., 10., 0})
+
+    //pointList = append(pointList, Vector{40., 30., 0})
+    //pointList = append(pointList, Vector{50., 20., 0})
+    //pointList = append(pointList, Vector{60., 10., 0})
+
+    // Special case where the intersection is equal to p and q.
+    // Works now for this case!
     /*
-    pointList = append(pointList, Vector{10., 10., 0})
-    pointList = append(pointList, Vector{20., 20., 0})
-    pointList = append(pointList, Vector{30., 10., 0})
-    pointList = append(pointList, Vector{40., 30., 0})
-    pointList = append(pointList, Vector{50., 20., 0})
-    pointList = append(pointList, Vector{25., 40., 0})
-    pointList = append(pointList, Vector{60., 10., 0})
+    pointList = append(pointList, Vector{30., 50., 0})
+    pointList = append(pointList, Vector{40., 20., 0})
+    pointList = append(pointList, Vector{60., 20., 0})
+    pointList = append(pointList, Vector{70., 50., 0})
     */
 
     v := CreateVoronoi(pointList)
     v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
 
     v.createImage()
 
