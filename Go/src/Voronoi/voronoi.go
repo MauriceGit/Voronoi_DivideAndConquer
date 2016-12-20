@@ -13,6 +13,7 @@ import (
     "image"
     "image/color"
     "image/png"
+    "time"
 )
 
 // HAS to be an infinite face!
@@ -90,7 +91,7 @@ func drawCircle(m *image.RGBA, posX, posY, radius int, c color.RGBA) {
     }
 }
 
-func (v *Voronoi)createImage() {
+func (v *Voronoi)createImage(filename string) {
     var w, h int = 1000, 1000
 
     m := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -148,7 +149,7 @@ func (v *Voronoi)createImage() {
         }
     }
 
-    f, err := os.OpenFile("voronoi.png", os.O_WRONLY|os.O_CREATE, 0600)
+    f, err := os.OpenFile(filename + ".png", os.O_WRONLY|os.O_CREATE, 0600)
     if err != nil {
         fmt.Println(err)
         return
@@ -741,104 +742,16 @@ func CreateVoronoi(pointList PointList) Voronoi {
     return v
 }
 
-func main() {
-
-    var r = rand.New(rand.NewSource(0))
+//
+// Normal test distribution of points. No special cases for Voronoi generation.
+//
+func testNormal01() {
     var pointList PointList
 
-    for i:= 0; i < 0; i++ {
-        pointList = append(pointList, Vector{r.Float64()*100., r.Float64()*100., 0})
-    }
-
-    // Weird shit happening
-    // Endless loop with the last point removed...
-    /*
-    pointList = append(pointList, Vector{10., 15., 0})
-    pointList = append(pointList, Vector{15., 65., 0})
-    pointList = append(pointList, Vector{20., 40., 0})
-    pointList = append(pointList, Vector{40., 5., 0})
-    pointList = append(pointList, Vector{50., 20., 0})
-    pointList = append(pointList, Vector{60., 60., 0})
-    pointList = append(pointList, Vector{70., 70., 0})
-    pointList = append(pointList, Vector{90., 10., 0})
-    */
-
-    // Special case. Intersection with both p and q equally.
-    // Requires special handling!
-    /*
-    pointList = append(pointList, Vector{28, 30, 0})
-    pointList = append(pointList, Vector{30, 20, 0})
-    pointList = append(pointList, Vector{30, 40, 0})
-
-    pointList = append(pointList, Vector{42, 30, 0})
-    pointList = append(pointList, Vector{40, 20, 0})
-    pointList = append(pointList, Vector{40, 40, 0})
-    */
-
-    // Linear dependent minimal points
-    pointList = append(pointList, Vector{20, 10, 0})
-    pointList = append(pointList, Vector{30, 10, 0})
-    pointList = append(pointList, Vector{40, 10, 0})
-    pointList = append(pointList, Vector{50, 10, 0})
-
-
-    // Works fine!
-    /*
-    pointList = append(pointList, Vector{40., 10., 0})
-    pointList = append(pointList, Vector{50., 20., 0})
-    pointList = append(pointList, Vector{60., 10., 0})
-    pointList = append(pointList, Vector{70., 30., 0})
-    pointList = append(pointList, Vector{80., 20., 0})
-    pointList = append(pointList, Vector{55., 40., 0})
-    */
-
-    // Wrong vertices and not sure about how to calculate the actual tessellation myself!
-    // HA, Works now!
-    /*
     pointList = append(pointList, Vector{10., 10., 0})
     pointList = append(pointList, Vector{20., 20., 0})
     pointList = append(pointList, Vector{30., 10., 0})
     pointList = append(pointList, Vector{40., 50., 0})
-    */
-
-    // Wrong vertex. Minimum configuration that fails.
-    // Update: Works now!
-    /*pointList = append(pointList, Vector{30., 10., 0})
-    pointList = append(pointList, Vector{40., 20., 0})
-    pointList = append(pointList, Vector{45., 45., 0})
-    pointList = append(pointList, Vector{50., 10., 0})
-    */
-
-    // Linear dependent points. This is currently a problem!
-    /*
-    pointList = append(pointList, Vector{30., 10., 0})
-    pointList = append(pointList, Vector{40., 10., 0})
-    pointList = append(pointList, Vector{50., 10., 0})
-    pointList = append(pointList, Vector{60., 10., 0})
-    pointList = append(pointList, Vector{70., 10., 0})
-    */
-
-    // Looping infinitly. Problem occurs when the last point is added!
-
-    //pointList = append(pointList, Vector{10., 10., 0})
-    //pointList = append(pointList, Vector{20., 20., 0})
-
-    //pointList = append(pointList, Vector{25., 40., 0})
-
-    //pointList = append(pointList, Vector{30., 10., 0})
-
-    //pointList = append(pointList, Vector{40., 30., 0})
-    //pointList = append(pointList, Vector{50., 20., 0})
-    //pointList = append(pointList, Vector{60., 10., 0})
-
-    // Special case where the intersection is equal to p and q.
-    // Works now for this case!
-    /*
-    pointList = append(pointList, Vector{30., 50., 0})
-    pointList = append(pointList, Vector{40., 20., 0})
-    pointList = append(pointList, Vector{60., 20., 0})
-    pointList = append(pointList, Vector{70., 50., 0})
-    */
 
     v := CreateVoronoi(pointList)
     v.pprint()
@@ -846,8 +759,216 @@ func main() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage()
+    v.createImage("test_normal_01")
+}
 
+func testNormal02() {
+    var pointList PointList
+
+    pointList = append(pointList, Vector{40., 10., 0})
+    pointList = append(pointList, Vector{50., 20., 0})
+    pointList = append(pointList, Vector{60., 10., 0})
+    pointList = append(pointList, Vector{70., 30., 0})
+    pointList = append(pointList, Vector{80., 20., 0})
+    pointList = append(pointList, Vector{55., 40., 0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_normal_02")
+}
+
+func testNormal03() {
+    var pointList PointList
+
+    pointList = append(pointList, Vector{30., 10., 0})
+    pointList = append(pointList, Vector{40., 20., 0})
+    pointList = append(pointList, Vector{45., 45., 0})
+    pointList = append(pointList, Vector{50., 10., 0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_normal_03")
+}
+
+//
+// Test cases where 4 lines meet and p/q have the same intersection point.
+//
+func testEqualIntersection01() {
+    var pointList PointList
+
+    pointList = append(pointList, Vector{28, 30, 0})
+    pointList = append(pointList, Vector{30, 20, 0})
+    pointList = append(pointList, Vector{30, 40, 0})
+
+    pointList = append(pointList, Vector{42, 30, 0})
+    pointList = append(pointList, Vector{40, 20, 0})
+    pointList = append(pointList, Vector{40, 40, 0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_equal_intersection_01")
+}
+
+func testEqualIntersection02() {
+    var pointList PointList
+
+    pointList = append(pointList, Vector{30., 50., 0})
+    pointList = append(pointList, Vector{40., 20., 0})
+    pointList = append(pointList, Vector{60., 20., 0})
+    pointList = append(pointList, Vector{70., 50., 0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_equal_intersection_02")
+}
+
+//
+// Test cases with linear dependent points or lines
+//
+func testLinearDepentence01() {
+    var pointList PointList
+
+    pointList = append(pointList, Vector{20, 10, 0})
+    pointList = append(pointList, Vector{30, 10, 0})
+    pointList = append(pointList, Vector{40, 10, 0})
+    pointList = append(pointList, Vector{50, 10, 0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_linear_dependence_01")
+}
+
+func testLinearDepentence02() {
+    var pointList PointList
+
+    pointList = append(pointList, Vector{30., 10., 0})
+    pointList = append(pointList, Vector{40., 10., 0})
+    pointList = append(pointList, Vector{50., 10., 0})
+    pointList = append(pointList, Vector{60., 10., 0})
+    pointList = append(pointList, Vector{70., 10., 0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_linear_dependence_02")
+}
+
+//
+// Test cases that cause infinite loops or unknown problems.
+//
+
+func testUnknownProblem01() {
+    var pointList PointList
+
+    pointList = append(pointList, Vector{10., 15., 0})
+    pointList = append(pointList, Vector{15., 65., 0})
+    pointList = append(pointList, Vector{20., 40., 0})
+    pointList = append(pointList, Vector{40.,  5., 0})
+    pointList = append(pointList, Vector{50., 20., 0})
+    pointList = append(pointList, Vector{60., 60., 0})
+    pointList = append(pointList, Vector{70., 70., 0})
+    pointList = append(pointList, Vector{90., 10., 0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_unknown_problem_01")
+}
+
+func testUnknownProblem02() {
+    var pointList PointList
+
+    pointList = append(pointList, Vector{10., 10., 0})
+    pointList = append(pointList, Vector{20., 20., 0})
+
+    pointList = append(pointList, Vector{25., 40., 0})
+
+    pointList = append(pointList, Vector{30., 10., 0})
+
+    pointList = append(pointList, Vector{40., 30., 0})
+    pointList = append(pointList, Vector{50., 20., 0})
+    pointList = append(pointList, Vector{60., 10., 0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_unknown_problem_02")
+}
+
+//
+// Test cases with random points
+//
+
+func testRandom(count int) {
+    seed := time.Now().UTC().UnixNano()
+    r := rand.New(rand.NewSource(seed))
+    var pointList PointList
+
+    fmt.Printf("Random poins:\n\t")
+    for i:= 0; i < count; i++ {
+        v := Vector{r.Float64()*100., r.Float64()*100., 0}
+        pointList = append(pointList, v)
+        fmt.Printf("%v, ", v)
+    }
+    fmt.Printf("\n\n")
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("voronoi_random_" + string(seed))
+}
+
+
+func main() {
+
+    testNormal01()
+    testNormal02()
+    testNormal03()
+
+    /*
+    go testEqualIntersection01()
+    go testEqualIntersection02()
+
+    go testLinearDepentence01()
+    go testLinearDepentence02()
+
+    go testUnknownProblem01()
+    go testUnknownProblem02()
+
+    go testRandom(10)
+    */
 }
 
 
