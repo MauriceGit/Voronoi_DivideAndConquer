@@ -293,8 +293,9 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
     }
 
     if s1/det < 0 || s1/det > 1 || s2/det < 0 || s2/det > 1 {
-        fmt.Println("I think, there is an intersection. But not within the edges given...")
-        return false, Vector{}
+        fmt.Println("THIS COULD BE A PROBLEM. THE INTERSECTION SEEMS TO BE OUTSIDE OF ONE OF THE EDGES...")
+        return true, Add(e2.Pos, Mult(e2.Dir, s1/det))
+        //return false, Vector{}
     }
 
     return true, Add(e2.Pos, Mult(e2.Dir, s1/det))

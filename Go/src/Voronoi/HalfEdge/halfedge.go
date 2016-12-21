@@ -30,6 +30,10 @@ type HEVertex struct {
     Pos             Vector
 }
 
+func (v VertexIndex) Valid() bool {
+    return v != EmptyVertex && v != InfiniteVertex
+}
+
 type HEFace struct {
     // Especially for Voronoi
     ReferencePoint  Vector
