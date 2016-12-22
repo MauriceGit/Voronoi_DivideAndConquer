@@ -3,7 +3,7 @@ package vector
 import (
     "fmt"
     "math"
-    //"github.com/paulmach/go.geo"
+    "github.com/paulmach/go.geo"
 )
 
 const (
@@ -150,7 +150,7 @@ func IsRight2D(v1, v2, test Vector) bool {
 
 // Calculates the intersection point of v1 and v2, if it exists.
 // http://stackoverflow.com/questions/20677795/find-the-point-of-intersecting-lines
-func LineIntersection(e1 Edge, e2 Edge) Vector {
+func LineIntersection1(e1 Edge, e2 Edge) (bool, Vector) {
 
     xdiff := Vector{X: e1.Dir.X, Y: e2.Dir.X}
     ydiff := Vector{X: e1.Dir.Y, Y: e2.Dir.Y}
@@ -158,41 +158,21 @@ func LineIntersection(e1 Edge, e2 Edge) Vector {
     div := Det2D(xdiff, ydiff)
     if div <= 0.0001 {
         fmt.Println("Lines do NOT intersect!")
-        return Vector{}
+        return false, Vector{}
     }
 
     d := Vector{X: Det2D(e1.Pos, Add(e1.Pos, e1.Dir)), Y: Det2D(e2.Pos, Add(e2.Pos, e2.Dir))}
 
-    return Vector{
+    return true, Vector{
         X: Det2D(d, xdiff) / div,
         Y: Det2D(d, ydiff) / div,
         Z: 0.0,
     }
 }
 
-/**
-inline bool lines_intersect_2d(Vector2 const& p0, Vector2 const& p1, Vector2 const& p2, Vector2 const& p3, Vector2* i const = 0) {
-    Vector2 const s1 = p1 - p0;
-    Vector2 const s2 = p3 - p2;
+func LineIntersection2(e1 Edge, e2 Edge) (bool, Vector) {
 
-    Vector2 const u = p0 - p2;
-
-    float const ip = 1.f / (-s2.x * s1.y + s1.x * s2.y);
-
-    float const s = (-s1.y * u.x + s1.x * u.y) * ip;
-    float const t = ( s2.x * u.y - s2.y * u.x) * ip;
-
-    if (s >= 0 && s <= 1 && t >= 0 && t <= 1) {
-        if (i) *i = p0 + (s1 * t);
-        return true;
-    }
-
-    return false;
-}
-*/
-func LineIntersection2(e1 Edge, e2 Edge) Vector {
-
-    fmt.Printf("No no no! e1: %v, e2: %v\n", e1.Dir, e2.Dir)
+    //fmt.Printf("No no no! e1: %v, e2: %v\n", e1.Dir, e2.Dir)
 
     s1 := e1.Dir
     s2 := e2.Dir
@@ -205,16 +185,16 @@ func LineIntersection2(e1 Edge, e2 Edge) Vector {
     t  := ( s2.X * u.Y - s2.Y * u.X) * ip
 
     if s >= 0 && s <= 1 && t >= 0 && t <= 1 {
-        return Add(e1.Pos, Mult(s1, t))
+        return true, Add(e1.Pos, Mult(s1, t))
     }
 
-    fmt.Println(s, t)
+    //fmt.Println(s, t)
 
     fmt.Println("Lines do (still) NOT intersect!")
-    return Vector{}
+    return false, Vector{}
 }
 
-/*
+
 func LineIntersection3(e1 Edge, e2 Edge) (bool, Vector) {
 
     path := geo.NewPath()
@@ -225,20 +205,21 @@ func LineIntersection3(e1 Edge, e2 Edge) (bool, Vector) {
 
     // intersects does a simpler check for yes/no
     if path.Intersects(line) {
-        fmt.Println("this shit intersects!")
+        //fmt.Println("this shit intersects!")
         // intersection will return the actual points and places on intersection
-        points, segments := path.Intersection(line)
+        points, _ := path.Intersection(line)
 
         for i, _ := range points {
-            fmt.Printf("Intersection %d at %v with path segment %d\n", i, points[i], segments[i][0])
+            //fmt.Printf("Intersection %d at %v with path segment %d\n", i, points[i], segments[i][0])
             return true, Vector{float64(points[i][0]), float64(points[i][1]),0}
         }
     }
 
-    fmt.Println("What the shit man????????????")
+    //fmt.Println("What the shit man????????????")
+    return true, InfinitePoint
     return false, Vector{}
 }
-*/
+
 /*
 func (l *Line) Interpolate(percent float64) *Point {
     return &Point{
