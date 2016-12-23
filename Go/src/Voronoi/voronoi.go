@@ -101,7 +101,7 @@ func drawCircle(m *image.RGBA, posX, posY, radius int, c color.RGBA) {
     }
 }
 
-func (v *Voronoi)createImage(filename string) {
+func (v *Voronoi)createImage(filename string, whole bool) {
     var w, h int = 1000, 1000
 
     m := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -114,8 +114,14 @@ func (v *Voronoi)createImage(filename string) {
     // green
     //c := color.RGBA{0,255,0,255}
     gc := draw2dimg.NewGraphicContext(m)
+
+    gc.SetLineWidth(2)
+    if whole {
+        gc.SetLineWidth(3)
+        c = color.RGBA{255,255,0,255}
+    }
     gc.SetStrokeColor(c)
-    gc.SetLineWidth(3)
+
     for i,e := range v.edges {
         var tmp HEEdge
         e2   := v.edges[e.ETwin]
@@ -148,7 +154,7 @@ func (v *Voronoi)createImage(filename string) {
 
 
             if edge == (Edge{}) {
-                continue
+                //continue
             }
 
             //fmt.Printf("From %v|%v ----> %v|%v\n", edge.Pos.X*10., float64(h) - edge.Pos.Y*10., Add(edge.Pos, edge.Dir).X*10., float64(h) - Add(edge.Pos, edge.Dir).Y*10.)
@@ -338,9 +344,7 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
 func commonSupportLine(v *Voronoi, h1, h2 ConvexHull, betterSideL func(v1, v2 Vector) bool, betterSideR func(v1, v2 Vector) bool, betterPoint func(v1, v2, test Vector) bool) (FaceIndex, FaceIndex) {
 
     ai := h1.bestFaceIndex(v, betterSideL)
-    //fmt.Println("    Best Left Face:", h1[ai])
     bi := h2.bestFaceIndex(v, betterSideR)
-    //fmt.Println("    Best Right Face:", h2[bi])
 
     finished := false
 
@@ -355,15 +359,32 @@ func commonSupportLine(v *Voronoi, h1, h2 ConvexHull, betterSideL func(v1, v2 Ve
         // iterating through the convex hull points...
         if len(h1) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h1[nextAi]].ReferencePoint) {
             ai = nextAi
-            nextAi = (ai-1)%len(h1)
-            if nextAi < 0 {
-                nextAi = len(h1)-1
-            }
             finished = false
         }
         // iterating through the convex hull points...
         if len(h2) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h2[(bi+1)%len(h2)]].ReferencePoint) {
             bi = (bi+1)%len(h2)
+            finished = false
+        }
+
+        // We try both directions every time! Because of some special cases, where the first point for h1 is the correct one, but for the very
+        // first step (maybe later?), the next point is better for the moment. It then never goes back to the actual globally better point.
+        // By checking both directions, we can actually get back. And there should be no downsides, as there is only ever one direction to go!
+
+        // iterating through the convex hull points...
+        if len(h1) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h1[(ai+1)%len(h1)]].ReferencePoint) {
+            ai = (ai+1)%len(h1)
+            finished = false
+        }
+
+        nextBi := (bi-1)%len(h2)
+        if nextBi < 0 {
+            nextBi = len(h2)-1
+        }
+
+        // iterating through the convex hull points...
+        if len(h2) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h2[nextBi]].ReferencePoint) {
+            bi = nextBi
             finished = false
         }
     }
@@ -414,6 +435,8 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     // Lower common support line!
     h1Down, h2Down := commonSupportLine(v,  h1, h2, isRight, isLeft, isBetterDown)
 
+    fmt.Printf("h1Up: %v, h2Up: %v, h1Down: %v, h2Down: %v\n", p, q, h1Down, h2Down)
+
     // We don't cross the same edge twice!
     lastPEdge := EmptyEdge
     lastQEdge := EmptyEdge
@@ -431,19 +454,21 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
         edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
 
+        //fmt.Printf("lastMerge: %v, p: %v, q: %v\n", lastMerge, p, q)
+
         switch {
 
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
             case edgeP == EmptyEdge && edgeQ == EmptyEdge:
-                //fmt.Println("1")
+                //fmt.Println("e")
                 dividingChain = append(dividingChain, ChainElem{Vector{}, EmptyEdge, EmptyEdge, p, q, bisector})
 
             // Equal Intersection with both edges. So 4 edges meet.
             case edgeQ != EmptyEdge && edgeP != EmptyEdge && Equal(locationP, locationQ):
                 // This could result in kind of an invalid Delaunay triangulations. At least regarding a triangle.
                 // This should now work for situations, where 4 edges meet. I have to re-examine for even more edges meeting...
-                //fmt.Println("2")
+                fmt.Println("p & q")
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, edgeQ, p, q, bisector})
 
                 lastVertex   = locationP
@@ -455,7 +480,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face p
             case edgeP != EmptyEdge && (edgeQ == EmptyEdge || locationP.Y >= locationQ.Y):
-                //fmt.Println("3")
+                fmt.Println("p")
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, EmptyEdge, p, q, bisector})
 
                 lastVertex   = locationP
@@ -466,7 +491,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face q
             case edgeQ != EmptyEdge && (edgeP == EmptyEdge || locationQ.Y >= locationP.Y):
-                //fmt.Println("4")
+                fmt.Println("q")
                 dividingChain = append(dividingChain, ChainElem{locationQ, EmptyEdge, edgeQ, p, q, bisector})
 
                 lastVertex   = locationQ
@@ -540,31 +565,27 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         if chain.edgeP != EmptyEdge {
             // Delete vertices that overlap with the other side (to the right)!
             vertex := v.edges[v.edges[chain.edgeP].ETwin].VOrigin
-            if vertex.Valid() && v.vertices[vertex] != emptyV && heVertex.Valid() {
-                // If the (to be deleted) vertex is actuall on the right side. Two ifs for clarification reaons.
-                if v.vertices[v.edges[v.edges[chain.edgeP].ETwin].VOrigin].Pos.X > v.vertices[heVertex].Pos.X {
-                    fmt.Printf("----> Found a vertex that has do be deleted (P) (v-index: %v - %v)\n", vertex, v.vertices[vertex].Pos)
+            if vertex.Valid() && v.vertices[vertex] != emptyV {
+                fmt.Printf("----> Found a vertex that has do be deleted (P) (v-index: %v - %v)\n", vertex, v.vertices[vertex].Pos)
 
-                    // Delete his twin of the following edge of edgeP
-                    // Are we going in the right direction?
-                    if v.edges[v.edges[chain.edgeP].ENext].VOrigin != vertex {
-                        fmt.Println("FOUND THE SHIT P")
+                // Delete his twin of the following edge of edgeP
+                // Are we going in the right direction?
+                if v.edges[v.edges[chain.edgeP].ENext].VOrigin != vertex {
+                    fmt.Println("FOUND THE SHIT P")
 
-                        v.edges[v.edges[chain.edgeP].ENext] = emptyE
-
-                    } else {
-                        v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
-                    }
-
-
-                    // Delete the following edge of edgeP
                     v.edges[v.edges[chain.edgeP].ENext] = emptyE
 
-                    // Delete the vertex.
-                    v.vertices[v.edges[v.edges[chain.edgeP].ETwin].VOrigin] = emptyV
+                } else {
+                    v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
                 }
-            }
 
+                // Delete the following edge of edgeP
+                v.edges[v.edges[chain.edgeP].ENext] = emptyE
+
+                // Delete the vertex.
+                v.vertices[v.edges[v.edges[chain.edgeP].ETwin].VOrigin] = emptyV
+
+            }
 
             v.edges[chain.edgeP].ENext = heEdgeUp
 
@@ -579,25 +600,23 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             // Delete vertices that overlap with the other side (to the left)!
             vertex := v.edges[chain.edgeQ].VOrigin
             if vertex.Valid() && v.vertices[vertex] != emptyV {
-                // If the (to be deleted) vertex is actuall on the right side. Two ifs for clarification reaons.
-                if v.vertices[v.edges[chain.edgeQ].VOrigin].Pos.X < v.vertices[heVertex].Pos.X {
-                    fmt.Printf("----> Found a vertex that has do be deleted (Q) (v-index: %v)\n", vertex)
+                fmt.Printf("----> Found a vertex that has do be deleted (Q) (v-index: %v)\n", vertex)
 
-
-                    if v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].VOrigin != vertex {
-                        fmt.Println("FOUND THE SHIT Q")
-                        v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
-                    } else {
-                        // We have to get the edge after that vertex and its twin. A bit tricky here...
-                        v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
-                    }
-
-                    // Delete the other one
+                if v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].VOrigin != vertex {
+                    fmt.Println("FOUND THE SHIT Q")
                     v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
-
-                    // Delete the vertex.
-                    v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
+                    //v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
+                } else {
+                    // We have to get the edge after that vertex and its twin. A bit tricky here...
+                    v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
                 }
+
+                // Delete the other one
+                v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
+
+                // Delete the vertex.
+                v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
+
             }
 
             v.edges[chain.edgeQ].VOrigin = heVertex
@@ -664,7 +683,7 @@ func testNormal01() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_normal_01")
+    v.createImage("test_normal_01", true)
 }
 
 func testNormal02() {
@@ -683,7 +702,7 @@ func testNormal02() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_normal_02")
+    v.createImage("test_normal_02", true)
 }
 
 func testNormal03() {
@@ -700,7 +719,7 @@ func testNormal03() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_normal_03")
+    v.createImage("test_normal_03", true)
 }
 
 //
@@ -723,7 +742,7 @@ func testEqualIntersection01() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_equal_intersection_01")
+    v.createImage("test_equal_intersection_01", true)
 }
 
 func testEqualIntersection02() {
@@ -740,7 +759,7 @@ func testEqualIntersection02() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_equal_intersection_02")
+    v.createImage("test_equal_intersection_02", true)
 }
 
 //
@@ -760,7 +779,7 @@ func testLinearDepentence01() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_linear_dependence_01")
+    v.createImage("test_linear_dependence_01", true)
 }
 
 func testLinearDepentence02() {
@@ -778,7 +797,7 @@ func testLinearDepentence02() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_linear_dependence_02")
+    v.createImage("test_linear_dependence_02", true)
 }
 
 func testLinearDepentence03() {
@@ -798,7 +817,7 @@ func testLinearDepentence03() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_linear_dependence_03")
+    v.createImage("test_linear_dependence_03", true)
 }
 
 func testLinearDepentence04() {
@@ -813,7 +832,7 @@ func testLinearDepentence04() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_linear_dependence_04")
+    v.createImage("test_linear_dependence_04", true)
 }
 
 //
@@ -844,7 +863,7 @@ func testUnknownProblem01() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_unknown_problem_01")
+    v.createImage("test_unknown_problem_01", true)
 }
 
 func testUnknownProblem02() {
@@ -867,7 +886,7 @@ func testUnknownProblem02() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_unknown_problem_02")
+    v.createImage("test_unknown_problem_02", true)
 }
 
 func testUnknownProblem03() {
@@ -890,7 +909,7 @@ func testUnknownProblem03() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_unknown_problem_03")
+    v.createImage("test_unknown_problem_03", true)
 }
 
 func testUnknownProblem04() {
@@ -908,6 +927,7 @@ func testUnknownProblem04() {
     pointList = append(pointList, Vector{71.996875920571910, 27.832275576849792, 0})
     pointList = append(pointList, Vector{72.329734102573130, 63.247795405728404, 0})
 
+
     if false {
         for i,_ := range pointList {
             //pointList[i] = Mult(pointList[i], 0.5)
@@ -915,13 +935,15 @@ func testUnknownProblem04() {
         }
     }
 
+    //pointList = pointList[:5]
+
     v := CreateVoronoi(pointList)
     v.pprint()
 
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_unknown_problem_04")
+    v.createImage("test_unknown_problem_04", true)
 }
 
 func testUnknownProblem05() {
@@ -940,7 +962,7 @@ func testUnknownProblem05() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_unknown_problem_05")
+    v.createImage("test_unknown_problem_05", true)
 }
 
 func testUnknownProblem06() {
@@ -959,7 +981,7 @@ func testUnknownProblem06() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_unknown_problem_06")
+    v.createImage("test_unknown_problem_06", true)
 }
 
 func testUnknownProblem07() {
@@ -978,7 +1000,7 @@ func testUnknownProblem07() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_unknown_problem_07")
+    v.createImage("test_unknown_problem_07", true)
 }
 
 func testUnknownProblem08() {
@@ -1002,7 +1024,56 @@ func testUnknownProblem08() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_unknown_problem_08")
+    v.createImage("test_unknown_problem_08", true)
+}
+
+func testUnknownProblem09() {
+    count := 5
+    var seed int64 = 1482476817056249360
+    r := rand.New(rand.NewSource(seed))
+    var pointList PointList
+
+    for i:= 0; i < count; i++ {
+        //v := Vector{r.Float64()*150., r.Float64()*150., 0}
+        v := Vector{r.Float64()*50.+25., r.Float64()*50.+25., 0}
+        pointList = append(pointList, v)
+    }
+
+    sort.Sort(pointList)
+
+    //pointList = pointList[2:]
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_unknown_problem_09", false)
+}
+
+func testUnknownProblem10() {
+    count := 5
+    var seed int64 = 1482477466512747360
+    r := rand.New(rand.NewSource(seed))
+    var pointList PointList
+
+    for i:= 0; i < count; i++ {
+        v := Vector{r.Float64()*50.+25., r.Float64()*50.+25., 0}
+        pointList = append(pointList, v)
+    }
+
+    sort.Sort(pointList)
+
+    //pointList = pointList[:5]
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_unknown_problem_10", true)
 }
 
 //
@@ -1029,13 +1100,13 @@ func testRandom(count int) {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_random_" + strconv.FormatInt(seed, 10))
+    v.createImage("test_random_" + strconv.FormatInt(seed, 10), true)
 }
 
 
 func main() {
 
-    workingExamples := false
+    workingExamples := true
 
     if workingExamples {
         // works.
@@ -1079,19 +1150,35 @@ func main() {
             testRandom(5)
         }
 
-        // seems to work.
+        // works.
         testUnknownProblem04()
 
-        // seems to work.
+        // works.
         testUnknownProblem05()
+
+        // works.
+        testUnknownProblem06()
+
+        // works.
+        testUnknownProblem07()
+
+        // works.
+        testUnknownProblem08()
+
+        // works.
+        testUnknownProblem09()
+
+        // works.
+        testUnknownProblem10()
     }
 
-    // doesn't work.
-    //testUnknownProblem06()
-    // doesn't work.
-    //testUnknownProblem07()
-    // doesn't work.
-    testUnknownProblem08()
+
+
+
+
+
+
+
 
     // works 1/2 with 10 points.
     // doesn't work at all with >= 20 points!!! Never finishes for none.
