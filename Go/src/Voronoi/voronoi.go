@@ -259,10 +259,12 @@ func (v *Voronoi)createVertex(pos Vector) VertexIndex {
 
 // Calculates the face with the 'best' (y-coord) reference point.
 // Can be used to calculate the lowest or highest point with the appropriate function.
-func (ch ConvexHull) bestFace(v *Voronoi, isBetter func(v1, v2 Vector) bool) int {
+// Returns the index of the convex hull list called upon.
+func (ch ConvexHull) bestFaceIndex(v *Voronoi, isBetter func(v1, v2 Vector) bool) int {
     bestFace := 0
-    for i,face := range ch {
-        if isBetter(v.faces[face].ReferencePoint, v.faces[ch[bestFace]].ReferencePoint) {
+    //fmt.Println ("  bestFace:", ch)
+    for i,_ := range ch {
+        if isBetter(v.faces[ch[i]].ReferencePoint, v.faces[ch[bestFace]].ReferencePoint) {
             bestFace = i
         }
     }
@@ -278,7 +280,7 @@ func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
             return v.edges[e].TmpEdge
         }
     } else {
-        fmt.Println("No problems here!!!!!!!!!!!!!!!!")
+        //fmt.Println("No problems here!!!!!!!!!!!!!!!!")
         return Edge {
             Pos: v.vertices[v.edges[e].VOrigin].Pos,
             Dir: Sub(v.vertices[v.edges[v.edges[e].ETwin].VOrigin].Pos, v.vertices[v.edges[e].VOrigin].Pos),
@@ -333,22 +335,34 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
 // Calculates the upper or lower common support line for the two given convex hulls.
 // Depending on the betterSide and betterPoint-function, it could potentially also calculate
 // left/right common support lines, depending on the divide-and-conquer approach of the main algorithm.
-func commonSupportLine(v *Voronoi, h1, h2 ConvexHull, betterSide func(v1, v2 Vector) bool, betterPoint func(v1, v2, test Vector) bool) (FaceIndex, FaceIndex) {
+func commonSupportLine(v *Voronoi, h1, h2 ConvexHull, betterSideL func(v1, v2 Vector) bool, betterSideR func(v1, v2 Vector) bool, betterPoint func(v1, v2, test Vector) bool) (FaceIndex, FaceIndex) {
 
-    ai := h1.bestFace(v, betterSide)
-    bi := h2.bestFace(v, betterSide)
+    ai := h1.bestFaceIndex(v, betterSideL)
+    //fmt.Println("    Best Left Face:", h1[ai])
+    bi := h2.bestFaceIndex(v, betterSideR)
+    //fmt.Println("    Best Right Face:", h2[bi])
 
     finished := false
 
     for !finished {
         finished = true
+
+        nextAi := (ai-1)%len(h1)
+        if nextAi < 0 {
+            nextAi = len(h1)-1
+        }
+
         // iterating through the convex hull points...
-        for len(h1) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h1[(ai+1)%len(h1)]].ReferencePoint) {
-            ai = (ai+1)%len(h1)
+        if len(h1) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h1[nextAi]].ReferencePoint) {
+            ai = nextAi
+            nextAi = (ai-1)%len(h1)
+            if nextAi < 0 {
+                nextAi = len(h1)-1
+            }
             finished = false
         }
         // iterating through the convex hull points...
-        for len(h2) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h2[(bi+1)%len(h2)]].ReferencePoint) {
+        if len(h2) > 1 && betterPoint(v.faces[h1[ai]].ReferencePoint, v.faces[h2[bi]].ReferencePoint, v.faces[h2[(bi+1)%len(h2)]].ReferencePoint) {
             bi = (bi+1)%len(h2)
             finished = false
         }
@@ -392,14 +406,13 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     isRight := func(v1, v2 Vector) bool {
         return v1.X > v2.X
     }
-    // Upper common support line!
-    p, q := commonSupportLine(v, h1, h2, isRight, isBetterUp)
-
     isLeft := func(v1, v2 Vector) bool {
-        return v1.X <= v2.X
+        return v1.X < v2.X
     }
+    // Upper common support line!
+    p, q := commonSupportLine(v, h1, h2, isLeft, isRight, isBetterUp)
     // Lower common support line!
-    h1Down, h2Down := commonSupportLine(v,  h1, h2, isLeft, isBetterDown)
+    h1Down, h2Down := commonSupportLine(v,  h1, h2, isRight, isLeft, isBetterDown)
 
     // We don't cross the same edge twice!
     lastPEdge := EmptyEdge
@@ -423,13 +436,14 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
             case edgeP == EmptyEdge && edgeQ == EmptyEdge:
+                //fmt.Println("1")
                 dividingChain = append(dividingChain, ChainElem{Vector{}, EmptyEdge, EmptyEdge, p, q, bisector})
 
             // Equal Intersection with both edges. So 4 edges meet.
             case edgeQ != EmptyEdge && edgeP != EmptyEdge && Equal(locationP, locationQ):
                 // This could result in kind of an invalid Delaunay triangulations. At least regarding a triangle.
                 // This should now work for situations, where 4 edges meet. I have to re-examine for even more edges meeting...
-
+                //fmt.Println("2")
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, edgeQ, p, q, bisector})
 
                 lastVertex   = locationP
@@ -441,7 +455,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face p
             case edgeP != EmptyEdge && (edgeQ == EmptyEdge || locationP.Y >= locationQ.Y):
-
+                //fmt.Println("3")
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, EmptyEdge, p, q, bisector})
 
                 lastVertex   = locationP
@@ -452,7 +466,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face q
             case edgeQ != EmptyEdge && (edgeP == EmptyEdge || locationQ.Y >= locationP.Y):
-
+                //fmt.Println("4")
                 dividingChain = append(dividingChain, ChainElem{locationQ, EmptyEdge, edgeQ, p, q, bisector})
 
                 lastVertex   = locationQ
@@ -980,7 +994,7 @@ func testUnknownProblem08() {
 
     sort.Sort(pointList)
 
-    pointList = pointList[:5]
+    //pointList = pointList[:5]
 
     v := CreateVoronoi(pointList)
     v.pprint()
