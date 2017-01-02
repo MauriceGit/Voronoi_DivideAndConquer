@@ -653,9 +653,9 @@ func CreateVoronoi(pointList PointList) Voronoi {
     // See: http://www.cs.wustl.edu/~pless/546/lectures/L11.html
     // for the calculations of maximum voronoi object count.
     v := Voronoi {
-        vertices:           make([]HEVertex, 2*n-5 + 3),
+        vertices:           make([]HEVertex, 2*n-5 + 3 + 100),
         firstFreeVertexPos: 0,
-        edges:              make([]HEEdge, 2*(3*n-6) + 6),
+        edges:              make([]HEEdge, 2*(3*n-6) + 6 + 100),
         firstFreeEdgePos:   0,
         faces:              make([]HEFace, n),
         firstFreeFacePos:   0,
@@ -1076,6 +1076,24 @@ func testUnknownProblem10() {
     v.createImage("test_unknown_problem_10", true)
 }
 
+func testUnknownProblemSeed(seed int64, count int) {
+    r := rand.New(rand.NewSource(seed))
+    var pointList PointList
+
+    for i:= 0; i < count; i++ {
+        v := Vector{r.Float64()*50.+25., r.Float64()*50.+25., 0}
+        pointList = append(pointList, v)
+    }
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_unknown_problem_seed_" + strconv.FormatInt(seed, 10), true)
+}
+
 //
 // Test cases with random points
 //
@@ -1106,7 +1124,7 @@ func testRandom(count int) {
 
 func main() {
 
-    workingExamples := true
+    workingExamples := false
 
     if workingExamples {
         // works.
@@ -1145,7 +1163,7 @@ func main() {
         // works.
         testUnknownProblem03()
 
-        // works 30/30.
+        // works.
         for i := 0; i < 20; i++ {
             testRandom(5)
         }
@@ -1172,17 +1190,25 @@ func main() {
         testUnknownProblem10()
     }
 
+    crashes := false
+    infLoop := true
 
+    if crashes {
+        // Both crashes can be resolved by increasing the static size for vertices
+        // and edges.
+        testUnknownProblemSeed(1483370150842201370, 15)
+        testUnknownProblemSeed(1483369884537650258, 20)
+    }
 
-
-
-
-
-
+    if infLoop {
+        testUnknownProblemSeed(1483370038194119290, 15)
+        testUnknownProblemSeed(1483370089898481236, 15)
+        testUnknownProblemSeed(1483370130545841965, 15)
+    }
 
     // works 1/2 with 10 points.
     // doesn't work at all with >= 20 points!!! Never finishes for none.
-    //testRandom(10)
+    //testRandom(15)
 }
 
 
