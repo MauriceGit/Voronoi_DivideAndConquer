@@ -304,7 +304,7 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
     bestIntersection := Vector{}
 
     minY := -100000000000.0
-    maxY := 100000000000.0
+    maxY := -minY
     if lastVertex != (Vector{}) {
         maxY = lastVertex.Y
     }
@@ -321,6 +321,7 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
         //fmt.Printf("Found an intersection: %v, %v\n", intersects, location)
 
         if intersects &&
+           edge != lastEdge &&
            location.Y < maxY &&
            location.Y > minY &&
            !Equal(location, lastVertex) &&
@@ -435,7 +436,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     // Lower common support line!
     h1Down, h2Down := commonSupportLine(v,  h1, h2, isRight, isLeft, isBetterDown)
 
-    fmt.Printf("h1Up: %v, h2Up: %v, h1Down: %v, h2Down: %v\n", p, q, h1Down, h2Down)
+    //fmt.Printf("h1Up: %v, h2Up: %v, h1Down: %v, h2Down: %v\n", p, q, h1Down, h2Down)
 
     // We don't cross the same edge twice!
     lastPEdge := EmptyEdge
@@ -454,14 +455,14 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
         edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
 
-        //fmt.Printf("lastMerge: %v, p: %v, q: %v\n", lastMerge, p, q)
+        fmt.Printf("Intersection: p: %v, q: %v -- %v\n", p, q, Mult(bisector.Dir, 0.01))
 
         switch {
 
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
-            case edgeP == EmptyEdge && edgeQ == EmptyEdge:
-                //fmt.Println("e")
+            case edgeP == EmptyEdge && edgeQ == EmptyEdge && lastMerge:
+                fmt.Println("e")
                 dividingChain = append(dividingChain, ChainElem{Vector{}, EmptyEdge, EmptyEdge, p, q, bisector})
 
             // Equal Intersection with both edges. So 4 edges meet.
@@ -498,7 +499,19 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
                 lastQEdge    = edgeQ
                 lastPEdge    = EmptyEdge
 
+                fmt.Printf("old q: %v, edgeQ-face: %v, twin-face: %v\n", q, v.edges[edgeQ].FFace, v.edges[v.edges[edgeQ].ETwin].FFace)
+
+                //if v.edges[edgeQ].FFace != q
+
                 q = v.edges[v.edges[edgeQ].ETwin].FFace
+
+
+            default:
+                fmt.Println("default")
+                lastMerge = true
+                v.pprint()
+                os.Exit(0)
+
 
         }
 
@@ -1085,6 +1098,9 @@ func testUnknownProblemSeed(seed int64, count int) {
         pointList = append(pointList, v)
     }
 
+    sort.Sort(pointList)
+    //pointList = pointList[len(pointList)/2:]
+
     v := CreateVoronoi(pointList)
     v.pprint()
 
@@ -1196,14 +1212,19 @@ func main() {
     if crashes {
         // Both crashes can be resolved by increasing the static size for vertices
         // and edges.
+        // Idea: Add an additional list for vertices, edges and faces (?) that contain a list
+        // of free additional positions for new vertices/edges.
+        // On those lists, only prepend-operations will be done [O(1)].
+        // If len(list) > 0, we just take the first additional free position. That way, we
+        // never get over the max list size and do not get additional time other than O(1).
         testUnknownProblemSeed(1483370150842201370, 15)
         testUnknownProblemSeed(1483369884537650258, 20)
     }
 
     if infLoop {
         testUnknownProblemSeed(1483370038194119290, 15)
-        testUnknownProblemSeed(1483370089898481236, 15)
-        testUnknownProblemSeed(1483370130545841965, 15)
+        //testUnknownProblemSeed(1483370089898481236, 15)
+        //testUnknownProblemSeed(1483370130545841965, 15)
     }
 
     // works 1/2 with 10 points.
