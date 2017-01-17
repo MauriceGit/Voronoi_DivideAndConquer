@@ -456,6 +456,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
 
         fmt.Printf("Intersection: p: %v, q: %v -- %v\n", p, q, Mult(bisector.Dir, 0.01))
+        fmt.Printf("            : edgeP %v, edgeQ: %v, lastMerge: %v\n", edgeP, edgeQ, lastMerge)
 
         switch {
 
@@ -499,7 +500,11 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
                 lastQEdge    = edgeQ
                 lastPEdge    = EmptyEdge
 
-                fmt.Printf("old q: %v, edgeQ-face: %v, twin-face: %v\n", q, v.edges[edgeQ].FFace, v.edges[v.edges[edgeQ].ETwin].FFace)
+                fmt.Printf("old q: %v, edgeQ: %v, edgeQ-face: %v, twin-face: %v\n", q, edgeQ, v.edges[edgeQ].FFace, v.edges[v.edges[edgeQ].ETwin].FFace)
+                if edgeQ == 54 {
+                    ee := v.edges[54]
+                    fmt.Printf ("CRITICAL: v: %v, twin: %v, next: %v, face: %v\n", ee.VOrigin, ee.ETwin, ee.ENext, ee.FFace)
+                }
 
                 //if v.edges[edgeQ].FFace != q
 
@@ -540,6 +545,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
     chain := v.extractDividingChain(left, right)
 
+
     // Iterating through the dividing chain and actually merge the voronois.
     for _,chain := range chain {
 
@@ -561,6 +567,20 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         heEdgeDown := v.createEdge(lastVertex, heEdgeUp,  chain.edgeQ, chain.q, chain.bisector)
         v.edges[heEdgeUp].ETwin = heEdgeDown
 
+        if heEdgeDown == 54 || heEdgeUp == 54 {
+            ee := v.edges[54]
+            fmt.Println("===============================================")
+            fmt.Println("============== FOUND THAT SHIT ================")
+            fmt.Println("===============================================")
+            fmt.Printf ("= v: %v, twin: %v, next: %v, face: %v\n", ee.VOrigin, ee.ETwin, ee.ENext, ee.FFace)
+            fmt.Println("===============================================")
+        }
+
+        if v.edges[54] != (HEEdge{}) {
+            ee := v.edges[54]
+            fmt.Printf ("CRITICAL: v: %v, twin: %v, next: %v, face: %v\n", ee.VOrigin, ee.ETwin, ee.ENext, ee.FFace)
+        }
+
         if lastDownEdge != EmptyEdge {
             v.edges[lastDownEdge].ENext = heEdgeDown
         }
@@ -581,22 +601,28 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             if vertex.Valid() && v.vertices[vertex] != emptyV {
                 fmt.Printf("----> Found a vertex that has do be deleted (P) (v-index: %v - %v)\n", vertex, v.vertices[vertex].Pos)
 
-                // Delete his twin of the following edge of edgeP
-                // Are we going in the right direction?
-                if v.edges[v.edges[chain.edgeP].ENext].VOrigin != vertex {
-                    fmt.Println("FOUND THE SHIT P")
+                if v.edges[v.edges[chain.edgeP].ENext].ETwin == 54 {
+                    fmt.Println("SHIT GOES DOWN HERE 1")
+                }
 
-                    v.edges[v.edges[chain.edgeP].ENext] = emptyE
+                v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
+                v.edges[v.edges[chain.edgeP].ENext].ETwin = EmptyEdge
 
-                } else {
-                    v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
+                if v.edges[chain.edgeP].ENext == 54 {
+                    fmt.Println("SHIT GOES DOWN HERE 2")
                 }
 
                 // Delete the following edge of edgeP
                 v.edges[v.edges[chain.edgeP].ENext] = emptyE
+                v.edges[chain.edgeP].ENext = EmptyEdge
+
+
+
 
                 // Delete the vertex.
                 v.vertices[v.edges[v.edges[chain.edgeP].ETwin].VOrigin] = emptyV
+                v.edges[v.edges[chain.edgeP].ETwin].VOrigin = EmptyVertex
+
 
             }
 
@@ -638,6 +664,17 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         } else {
             lastDownEdge = heEdgeDown
         }
+
+        if v.edges[54] != (HEEdge{}) {
+            ee := v.edges[54]
+            fmt.Printf ("CRITICAL: v: %v, twin: %v, next: %v, face: %v\n", ee.VOrigin, ee.ETwin, ee.ENext, ee.FFace)
+        }
+
+    }
+
+    if v.edges[54] != (HEEdge{}) {
+        ee := v.edges[54]
+        fmt.Printf ("CRITICAL: v: %v, twin: %v, next: %v, face: %v\n", ee.VOrigin, ee.ETwin, ee.ENext, ee.FFace)
     }
 
     fmt.Printf("FINISHED MERGE OF %v AND %v\n\n", left, right)
