@@ -462,7 +462,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
-            case edgeP == EmptyEdge && edgeQ == EmptyEdge && lastMerge:
+            case edgeP == EmptyEdge && edgeQ == EmptyEdge:
                 fmt.Println("e")
                 dividingChain = append(dividingChain, ChainElem{Vector{}, EmptyEdge, EmptyEdge, p, q, bisector})
 
@@ -605,8 +605,16 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     fmt.Println("SHIT GOES DOWN HERE 1")
                 }
 
-                v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
-                v.edges[v.edges[chain.edgeP].ENext].ETwin = EmptyEdge
+                // This works. Have to further investigate.
+                if v.edges[v.edges[chain.edgeP].ENext].VOrigin != vertex {
+                    v.edges[v.edges[chain.edgeP].ENext] = emptyE
+                } else {
+                    v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
+                }
+
+                // This is wrong! Seemingly. Have to investigate it.
+                //v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
+                //v.edges[v.edges[chain.edgeP].ENext].ETwin = EmptyEdge
 
                 if v.edges[chain.edgeP].ENext == 54 {
                     fmt.Println("SHIT GOES DOWN HERE 2")
@@ -641,20 +649,57 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             if vertex.Valid() && v.vertices[vertex] != emptyV {
                 fmt.Printf("----> Found a vertex that has do be deleted (Q) (v-index: %v)\n", vertex)
 
-                if v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].VOrigin != vertex {
-                    fmt.Println("FOUND THE SHIT Q")
+
+                /// NEW
+                /*
+                    /// d
+                    if v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] != emptyE {
+                        v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
+                        v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin = EmptyEdge
+                    }
+
+                    /// a
+                    if v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] != emptyE {
+                        v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
+                        v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext = EmptyEdge
+                    }
+
+                    /// c
+                    if v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin] != emptyE {
+                        v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin] = emptyE
+                        v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin = EmptyEdge
+                    }
+
+                    /// b
+                    if v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext] != emptyE {
+                        v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext] = emptyE
+                        v.edges[v.edges[chain.edgeQ].ETwin].ENext = EmptyEdge
+                    }
+
+                    /// v
+                    v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
+                */
+
+
+
+
+                /// OLD
+
+                    if v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].VOrigin != vertex {
+                        fmt.Println("FOUND THE SHIT Q")
+                       v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
+                        //v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
+                    } else {
+                        // We have to get the edge after that vertex and its twin. A bit tricky here...
+                        v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
+                    }
+
+                    // Delete the other one
                     v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
-                    //v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
-                } else {
-                    // We have to get the edge after that vertex and its twin. A bit tricky here...
-                    v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
-                }
 
-                // Delete the other one
-                v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
+                    // Delete the vertex.
+                    v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
 
-                // Delete the vertex.
-                v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
 
             }
 
@@ -1244,7 +1289,10 @@ func main() {
     }
 
     crashes := false
-    infLoop := true
+    infLoop := false
+
+    // works.
+    testUnknownProblem04()
 
     if crashes {
         // Both crashes can be resolved by increasing the static size for vertices
