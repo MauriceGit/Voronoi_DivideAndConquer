@@ -41,6 +41,9 @@ type ChainElem struct {
     bisector        Edge
 }
 
+
+var g_recursions int = 0
+
 ////////////////////////////////////////////////////////////////////////
 //  Pretty Print the  Voronoi Attributes
 ////////////////////////////////////////////////////////////////////////
@@ -146,7 +149,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
 
                 // We don't have any endpoints.
                 default:
-                    i = i
+                    //i = i
                     // amplified line. Exceeding all boundaries. Infinite line.
                     edge = createLine(v, EdgeIndex(i), false)
             }
@@ -182,6 +185,37 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     }
 
     f, err := os.OpenFile(filename + ".png", os.O_WRONLY|os.O_CREATE, 0600)
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    defer f.Close()
+    png.Encode(f, m)
+}
+
+
+func drawDividingChain(chain []ChainElem) {
+    var w, h int = 1000, 1000
+
+    m := image.NewRGBA(image.Rect(0, 0, w, h))
+
+    // blue
+    c := color.RGBA{0,0,255,255}
+    // green
+    //c := color.RGBA{0,255,0,255}
+    gc := draw2dimg.NewGraphicContext(m)
+
+    gc.SetLineWidth(2)
+
+    gc.SetStrokeColor(c)
+
+    for _,ch := range chain {
+        drawCircle(m, int(ch.intersection.X*10), h-int(ch.intersection.Y*10), 5, c)
+    }
+
+
+
+    f, err := os.OpenFile("dividing_chain_rec_8.png", os.O_WRONLY|os.O_CREATE, 0600)
     if err != nil {
         fmt.Println(err)
         return
@@ -279,6 +313,29 @@ func (ch ConvexHull) bestFaceIndex(v *Voronoi, isBetter func(v1, v2 Vector) bool
 
 // Creates a line from the HEEdge. Depeding on its state from the edge or the TmpEdge.
 func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
+
+
+
+    switch {
+        case !v.edges[e].VOrigin.Valid() && v.edges[v.edges[e].ETwin].VOrigin.Valid():
+            edge := v.edges[e].TmpEdge
+            edge.Dir = Mult(edge.Dir, 50)
+            return edge
+        case v.edges[e].VOrigin.Valid() && !v.edges[v.edges[e].ETwin].VOrigin.Valid():
+            edge := v.edges[e].TmpEdge
+            edge.Dir = Mult(edge.Dir, 50)
+            return edge
+        case !v.edges[e].VOrigin.Valid() && !v.edges[v.edges[e].ETwin].VOrigin.Valid():
+             return Amplify(v.edges[e].TmpEdge, 50.0)
+        default:
+            //fmt.Println("No problems here!!!!!!!!!!!!!!!!")
+            return Edge {
+                Pos: v.vertices[v.edges[e].VOrigin].Pos,
+                Dir: Sub(v.vertices[v.edges[v.edges[e].ETwin].VOrigin].Pos, v.vertices[v.edges[e].VOrigin].Pos),
+            }
+    }
+
+    /*
     if !v.edges[e].VOrigin.Valid() || !v.edges[v.edges[e].ETwin].VOrigin.Valid() {
         if amplified {
             return Amplify(v.edges[e].TmpEdge, 50.0)
@@ -292,6 +349,7 @@ func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
             Dir: Sub(v.vertices[v.edges[v.edges[e].ETwin].VOrigin].Pos, v.vertices[v.edges[e].VOrigin].Pos),
         }
     }
+    */
 }
 
 // Calculates the highest intersection of the given bisector and any edge of the
@@ -422,6 +480,15 @@ func isBetterDown(v1, v2, test Vector) bool {
 func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem {
     var dividingChain []ChainElem
 
+    fmt.Printf("dividing chain for recursion: %v\n", g_recursions)
+
+    if g_recursions >= 8 {
+
+        //v.createImage("test_rec_8", true)
+
+        //os.Exit(0)
+    }
+
     h1 := v.ConvexHull(left)
     h2 := v.ConvexHull(right)
 
@@ -455,15 +522,23 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
         edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
 
-        fmt.Printf("Intersection: p: %v, q: %v -- %v\n", p, q, Mult(bisector.Dir, 0.01))
-        fmt.Printf("            : edgeP %v, edgeQ: %v, lastMerge: %v\n", edgeP, edgeQ, lastMerge)
+        //fmt.Printf("Intersection: p: %v, q: %v -- %v\n", p, q, Mult(bisector.Dir, 0.01))
+        //fmt.Printf("            : edgeP %v, edgeQ: %v, lastMerge: %v\n", edgeP, edgeQ, lastMerge)
 
         switch {
 
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
             case edgeP == EmptyEdge && edgeQ == EmptyEdge:
-                fmt.Println("e")
+                //fmt.Println("e")
+
+                if g_recursions >= 8 {
+
+                    drawDividingChain(dividingChain)
+
+                    os.Exit(0)
+                }
+
                 dividingChain = append(dividingChain, ChainElem{Vector{}, EmptyEdge, EmptyEdge, p, q, bisector})
 
             // Equal Intersection with both edges. So 4 edges meet.
@@ -501,12 +576,6 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
                 lastPEdge    = EmptyEdge
 
                 fmt.Printf("old q: %v, edgeQ: %v, edgeQ-face: %v, twin-face: %v\n", q, edgeQ, v.edges[edgeQ].FFace, v.edges[v.edges[edgeQ].ETwin].FFace)
-                if edgeQ == 54 {
-                    ee := v.edges[54]
-                    fmt.Printf ("CRITICAL: v: %v, twin: %v, next: %v, face: %v\n", ee.VOrigin, ee.ETwin, ee.ENext, ee.FFace)
-                }
-
-                //if v.edges[edgeQ].FFace != q
 
                 q = v.edges[v.edges[edgeQ].ETwin].FFace
 
@@ -520,6 +589,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
         }
 
+
         if lastMerge {
             break
         }
@@ -528,6 +598,8 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         bisector = Amplify(bisector, 100.0)
 
     }
+
+
 
     return dividingChain
 }
@@ -538,6 +610,8 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     var emptyV HEVertex
     var emptyE HEEdge
+
+    g_recursions += 1;
 
     nextPEdge    := EmptyEdge
     lastDownEdge := EmptyEdge
@@ -598,40 +672,41 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         if chain.edgeP != EmptyEdge {
             // Delete vertices that overlap with the other side (to the right)!
             vertex := v.edges[v.edges[chain.edgeP].ETwin].VOrigin
+
+            /*if vertex.Valid() && v.vertices[vertex] != emptyV {
+                fmt.Printf("    ----> Found a vertex that has do be deleted (P) (v-index: %v - %v)\n", vertex, v.vertices[vertex].Pos)
+
+                v.vertices[v.edges[v.edges[chain.edgeP].ENext].VOrigin] = emptyV
+                v.edges[v.edges[chain.edgeP].ETwin].VOrigin = EmptyVertex
+
+                v.edges[v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin].ENext].VOrigin = EmptyVertex
+                v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
+                v.edges[v.edges[chain.edgeP].ENext] = emptyE
+                v.edges[chain.edgeP].ENext = EmptyEdge
+
+            }*/
+
             if vertex.Valid() && v.vertices[vertex] != emptyV {
                 fmt.Printf("----> Found a vertex that has do be deleted (P) (v-index: %v - %v)\n", vertex, v.vertices[vertex].Pos)
 
-                if v.edges[v.edges[chain.edgeP].ENext].ETwin == 54 {
-                    fmt.Println("SHIT GOES DOWN HERE 1")
-                }
-
                 // This works. Have to further investigate.
                 if v.edges[v.edges[chain.edgeP].ENext].VOrigin != vertex {
+
+                    fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 0")
+                    fmt.Println(vertex, v.edges[v.edges[chain.edgeP].ENext].VOrigin)
+
                     v.edges[v.edges[chain.edgeP].ENext] = emptyE
                 } else {
                     v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
-                }
-
-                // This is wrong! Seemingly. Have to investigate it.
-                //v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
-                //v.edges[v.edges[chain.edgeP].ENext].ETwin = EmptyEdge
-
-                if v.edges[chain.edgeP].ENext == 54 {
-                    fmt.Println("SHIT GOES DOWN HERE 2")
                 }
 
                 // Delete the following edge of edgeP
                 v.edges[v.edges[chain.edgeP].ENext] = emptyE
                 v.edges[chain.edgeP].ENext = EmptyEdge
 
-
-
-
                 // Delete the vertex.
                 v.vertices[v.edges[v.edges[chain.edgeP].ETwin].VOrigin] = emptyV
                 v.edges[v.edges[chain.edgeP].ETwin].VOrigin = EmptyVertex
-
-
             }
 
             v.edges[chain.edgeP].ENext = heEdgeUp
@@ -647,59 +722,22 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             // Delete vertices that overlap with the other side (to the left)!
             vertex := v.edges[chain.edgeQ].VOrigin
             if vertex.Valid() && v.vertices[vertex] != emptyV {
-                fmt.Printf("----> Found a vertex that has do be deleted (Q) (v-index: %v)\n", vertex)
+                fmt.Printf("    ----> Found a vertex that has do be deleted (Q) (v-index: %v)\n", vertex)
 
+                //edgeQ.ETwin.ENext.ETwin.ENext.ENext.ETwin.ENext
 
-                /// NEW
-                /*
-                    /// d
-                    if v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] != emptyE {
-                        v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
-                        v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin = EmptyEdge
-                    }
+                if v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] != emptyE {
 
-                    /// a
-                    if v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] != emptyE {
-                        v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
-                        v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext = EmptyEdge
-                    }
-
-                    /// c
-                    if v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin] != emptyE {
-                        v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin] = emptyE
-                        v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin = EmptyEdge
-                    }
-
-                    /// b
-                    if v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext] != emptyE {
-                        v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext] = emptyE
-                        v.edges[v.edges[chain.edgeQ].ETwin].ENext = EmptyEdge
-                    }
-
-                    /// v
-                    v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
-                */
-
-
-
-
-                /// OLD
-
-                    if v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].VOrigin != vertex {
-                        fmt.Println("FOUND THE SHIT Q")
-                       v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
-                        //v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
-                    } else {
-                        // We have to get the edge after that vertex and its twin. A bit tricky here...
-                        v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
-                    }
-
-                    // Delete the other one
+                    v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
                     v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
 
-                    // Delete the vertex.
-                    v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
+                    v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext = EmptyEdge
+                    v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].VOrigin = EmptyVertex
+                    v.edges[v.edges[chain.edgeQ].ETwin].ENext = EmptyEdge
 
+                }
+
+                v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
 
             }
 
@@ -1181,7 +1219,7 @@ func testUnknownProblemSeed(seed int64, count int) {
     }
 
     sort.Sort(pointList)
-    //pointList = pointList[len(pointList)/2:]
+    //pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
     v.pprint()
@@ -1289,10 +1327,7 @@ func main() {
     }
 
     crashes := false
-    infLoop := false
-
-    // works.
-    testUnknownProblem04()
+    infLoop := true
 
     if crashes {
         // Both crashes can be resolved by increasing the static size for vertices
@@ -1307,7 +1342,7 @@ func main() {
     }
 
     if infLoop {
-        testUnknownProblemSeed(1483370038194119290, 15)
+        testUnknownProblemSeed(1483370038194119290, 9)
         //testUnknownProblemSeed(1483370089898481236, 15)
         //testUnknownProblemSeed(1483370130545841965, 15)
     }
