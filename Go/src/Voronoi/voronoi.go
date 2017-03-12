@@ -194,6 +194,83 @@ func (v *Voronoi)createImage(filename string, whole bool) {
 }
 
 
+func drawEdgeList(v *Voronoi, edges []EdgeIndex) {
+    var w, h int = 1000, 1000
+
+    m := image.NewRGBA(image.Rect(0, 0, w, h))
+
+    // Edges
+    // yellow
+    //c := color.RGBA{255,255,0,255}
+    // blue
+    c := color.RGBA{0,100,255,255}
+    // green
+    //c := color.RGBA{0,255,0,255}
+    gc := draw2dimg.NewGraphicContext(m)
+
+    gc.SetLineWidth(2)
+    gc.SetStrokeColor(c)
+
+    for i,eI := range edges {
+
+        if eI == EmptyEdge {
+            continue
+        }
+
+        e := v.edges[eI]
+
+        var tmp HEEdge
+        e2   := v.edges[e.ETwin]
+        if e != tmp && e2 != tmp {
+
+            edge := Edge{}
+            v1   := e.VOrigin
+            v2   := e2.VOrigin
+            switch {
+                // Best case. We have both endpoints. And none of them Infinity ones.
+                case v1.Valid() && v2.Valid() && v.vertices[v1].Pos != InfinitePoint && v.vertices[v2].Pos != InfinitePoint:
+                    //fmt.Printf("Edge in question: \n\t%v\n\t%v\n\t%v, %v\n", e, e2, v1, v2)
+                    edge = Edge{v.vertices[v1].Pos, Sub(v.vertices[v1].Pos, v.vertices[v2].Pos)}
+
+                // We have the "left" endpoint.
+                case v1.Valid() && v.vertices[v1].Pos != InfinitePoint && !v2.Valid():
+                    edge = Edge{v.vertices[v1].Pos, e.TmpEdge.Dir}
+
+                // We have the "right" endpoint.
+                case !v1.Valid() && v2.Valid() && v.vertices[v2].Pos != InfinitePoint:
+                    edge = Edge{v.vertices[v2].Pos, e2.TmpEdge.Dir}
+
+                // We don't have any endpoints.
+                default:
+                    //i = i
+                    // amplified line. Exceeding all boundaries. Infinite line.
+                    edge = createLine(v, EdgeIndex(i), false)
+            }
+
+
+
+            if edge == (Edge{}) {
+                //continue
+            }
+
+            //fmt.Printf("From %v|%v ----> %v|%v\n", edge.Pos.X*10., float64(h) - edge.Pos.Y*10., Add(edge.Pos, edge.Dir).X*10., float64(h) - Add(edge.Pos, edge.Dir).Y*10.)
+
+            gc.MoveTo(edge.Pos.X*10., float64(h) - edge.Pos.Y*10.)
+            gc.LineTo(Add(edge.Pos, edge.Dir).X*10., float64(h) - Add(edge.Pos, edge.Dir).Y*10.)
+            gc.FillStroke()
+            gc.Close()
+        }
+    }
+
+    f, err := os.OpenFile("edges.png", os.O_WRONLY|os.O_CREATE, 0600)
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    defer f.Close()
+    png.Encode(f, m)
+}
+
 func drawDividingChain(chain []ChainElem) {
     var w, h int = 1000, 1000
 
@@ -320,11 +397,11 @@ func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
         case !v.edges[e].VOrigin.Valid() && v.edges[v.edges[e].ETwin].VOrigin.Valid():
             edge := v.edges[e].TmpEdge
             edge.Dir = Mult(edge.Dir, 50)
-            return edge
+            return Amplify(edge, 50)
         case v.edges[e].VOrigin.Valid() && !v.edges[v.edges[e].ETwin].VOrigin.Valid():
             edge := v.edges[e].TmpEdge
             edge.Dir = Mult(edge.Dir, 50)
-            return edge
+            return Amplify(edge, 50)
         case !v.edges[e].VOrigin.Valid() && !v.edges[v.edges[e].ETwin].VOrigin.Valid():
              return Amplify(v.edges[e].TmpEdge, 50.0)
         default:
@@ -514,6 +591,10 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     bisector := PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
     bisector = Amplify(bisector, 100.0)
 
+
+    var edgeIndexList []EdgeIndex
+
+
     // As long as we didn't reach the lowest possible tangente, we continue.
     for {
         // Here we break out of the loop, when we reach the very bottom!
@@ -522,8 +603,13 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
         edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
 
-        //fmt.Printf("Intersection: p: %v, q: %v -- %v\n", p, q, Mult(bisector.Dir, 0.01))
-        //fmt.Printf("            : edgeP %v, edgeQ: %v, lastMerge: %v\n", edgeP, edgeQ, lastMerge)
+
+        edgeIndexList = append(edgeIndexList, edgeP)
+        edgeIndexList = append(edgeIndexList, edgeQ)
+
+        //fmt.Printf("    Inters: p: %v, q: %v -- %v\n", p, q, Mult(bisector.Dir, 0.01))
+        //fmt.Printf("          : edgeP %v, edgeQ: %v, lastMerge: %v\n", edgeP, edgeQ, lastMerge)
+
 
         switch {
 
@@ -534,7 +620,8 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
                 if g_recursions >= 8 {
 
-                    drawDividingChain(dividingChain)
+                    //drawDividingChain(dividingChain)
+                    drawEdgeList(v, edgeIndexList)
 
                     os.Exit(0)
                 }
@@ -546,6 +633,9 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
                 // This could result in kind of an invalid Delaunay triangulations. At least regarding a triangle.
                 // This should now work for situations, where 4 edges meet. I have to re-examine for even more edges meeting...
                 fmt.Println("p & q")
+                if g_recursions == 8 {
+                    fmt.Printf("    intersection: %v\n", locationP)
+                }
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, edgeQ, p, q, bisector})
 
                 lastVertex   = locationP
@@ -558,6 +648,9 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
             // We intersect with an edge of the face p
             case edgeP != EmptyEdge && (edgeQ == EmptyEdge || locationP.Y >= locationQ.Y):
                 fmt.Println("p")
+                if g_recursions == 8 {
+                    fmt.Printf("    intersection: %v (%v)\n", locationP, locationQ)
+                }
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, EmptyEdge, p, q, bisector})
 
                 lastVertex   = locationP
@@ -569,13 +662,16 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
             // We intersect with an edge of the face q
             case edgeQ != EmptyEdge && (edgeP == EmptyEdge || locationQ.Y >= locationP.Y):
                 fmt.Println("q")
+                if g_recursions == 8 {
+                    fmt.Printf("    intersection: %v (%v)\n", locationQ, locationP)
+                }
                 dividingChain = append(dividingChain, ChainElem{locationQ, EmptyEdge, edgeQ, p, q, bisector})
 
                 lastVertex   = locationQ
                 lastQEdge    = edgeQ
                 lastPEdge    = EmptyEdge
 
-                fmt.Printf("old q: %v, edgeQ: %v, edgeQ-face: %v, twin-face: %v\n", q, edgeQ, v.edges[edgeQ].FFace, v.edges[v.edges[edgeQ].ETwin].FFace)
+                //fmt.Printf("old q: %v, edgeQ: %v, edgeQ-face: %v, twin-face: %v\n", q, edgeQ, v.edges[edgeQ].FFace, v.edges[v.edges[edgeQ].ETwin].FFace)
 
                 q = v.edges[v.edges[edgeQ].ETwin].FFace
 
