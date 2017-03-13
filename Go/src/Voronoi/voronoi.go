@@ -43,6 +43,7 @@ type ChainElem struct {
 
 
 var g_recursions int = 0
+var g_edgeIndexList []EdgeIndex
 
 ////////////////////////////////////////////////////////////////////////
 //  Pretty Print the  Voronoi Attributes
@@ -203,7 +204,7 @@ func drawEdgeList(v *Voronoi, edges []EdgeIndex) {
     // yellow
     //c := color.RGBA{255,255,0,255}
     // blue
-    c := color.RGBA{0,100,255,255}
+    c := color.RGBA{0,100,100,255}
     // green
     //c := color.RGBA{0,255,0,255}
     gc := draw2dimg.NewGraphicContext(m)
@@ -449,11 +450,16 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
 
     first := true
 
+
     // Find be highest/best intersection of the bisector and edge.
     for edge != EmptyEdge && (first || edge != veryFirstEdge) {
 
         intersects, location := LineIntersection4(bisector, createLine(v, edge, true))
         //fmt.Printf("Found an intersection: %v, %v\n", intersects, location)
+
+        if (g_recursions == 8) {
+            g_edgeIndexList = append(g_edgeIndexList, edge)
+        }
 
         if intersects &&
            edge != lastEdge &&
@@ -465,6 +471,8 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
             bestEdge = edge
             bestIntersection = location
             minY = bestIntersection.Y
+
+
         }
 
         first = false
@@ -621,7 +629,8 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
                 if g_recursions >= 8 {
 
                     //drawDividingChain(dividingChain)
-                    drawEdgeList(v, edgeIndexList)
+                    //drawEdgeList(v, edgeIndexList)
+                    drawEdgeList(v, g_edgeIndexList)
 
                     os.Exit(0)
                 }
