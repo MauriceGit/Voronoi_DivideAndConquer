@@ -8,7 +8,7 @@ import (
 )
 
 const (
-    EPS = 0.00001
+    EPS = 0.000000001
 )
 
 var InfinitePoint = Vector{-100000,-100000, -100000}
@@ -263,7 +263,7 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
         // collinear, all bets are off
         if s1 <= EPS && s1 >= -EPS && s2 <= EPS && s2 >= -EPS {
         //if s1 == 0 && s2 == 0 {
-            fmt.Println(".... So maybe infinity? Hmpf")
+            //fmt.Println(".... So maybe infinity? Hmpf")
             // Some kind of infinity stuff-Point??
             // I could just say, they intersect in like 1000-distance.
             return true, InfinitePoint
@@ -277,7 +277,7 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
     //fmt.Println(reflect.TypeOf(s1), reflect.TypeOf(det), reflect.TypeOf(s1/det))
 
     if s1/det < 0 || s1/det > 1 || s2/det < 0 || s2/det > 1 {
-        fmt.Println("THIS COULD BE A PROBLEM. THE INTERSECTION SEEMS TO BE OUTSIDE OF ONE OF THE EDGES...")
+        //fmt.Println("THIS COULD BE A PROBLEM. THE INTERSECTION SEEMS TO BE OUTSIDE OF ONE OF THE EDGES...")
         return true, Add(e2.Pos, Mult(e2.Dir, s1/det))
         //return false, Vector{}
     }
