@@ -122,7 +122,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
 
     gc.SetLineWidth(2)
     if whole {
-        gc.SetLineWidth(3)
+        gc.SetLineWidth(2)
         c = color.RGBA{255,255,0,255}
     }
     gc.SetStrokeColor(c)
@@ -182,7 +182,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     for _,ve := range v.vertices {
         var tmp HEVertex
         if ve != tmp {
-            drawCircle(m, int(ve.Pos.X*10), h-int(ve.Pos.Y*10), 5, c)
+            drawCircle(m, int(ve.Pos.X*10), h-int(ve.Pos.Y*10), 2, c)
         }
     }
 
@@ -1440,7 +1440,7 @@ func testUnknownProblemSeed(seed int64, count int) {
 
     sort.Sort(pointList)
 
-    pointList = pointList[len(pointList)/2:]
+    //pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
     v.pprint()
@@ -1484,28 +1484,24 @@ func testRandom(count int) {
 
 func main() {
 
-    workingExamples := false
+    working := false
 
-    if workingExamples {
-        // works.
-        fmt.Println("Test: testNormal01")
+    if working {
         testNormal01()
-
-        // works.
-        fmt.Println("Test: testNormal02")
         testNormal02()
-
-        // works.
-        fmt.Println("Test: testNormal03")
         testNormal03()
-
-        // works.
-        fmt.Println("Test: testEqualIntersection01")
         testEqualIntersection01()
-
-        // works.
-        fmt.Println("Test: testEqualIntersection0")
         testEqualIntersection02()
+        testLinearDepentence04()
+        testUnknownProblem03()
+        testUnknownProblem09()
+        testUnknownProblem10()
+        testUnknownProblemSeed(1489941049442429888, 5)
+    }
+
+    toBeVerified := false
+
+    if toBeVerified {
 
         // works.
         // A first edge {-1 0 6 1 {{35 510 0} {0 -1000 0}}}: 1 must be referenced as first edge by the corresponding face 1 !
@@ -1518,10 +1514,6 @@ func main() {
         testLinearDepentence03()
 
         // works.
-        fmt.Println("Test: testLinearDepentence04")
-        testLinearDepentence04()
-
-        // works.
         // A first edge {-1 7 25 3 {{-327.5 281.25 0} {-750 500 -0}}}: 6 must be referenced as first edge by the corresponding face 3 !
         fmt.Println("Test: testUnknownProblem01")
         testUnknownProblem01()
@@ -1530,10 +1522,6 @@ func main() {
         // A first edge {-2 15 12 3 {{45 1510 0} {-0 3000 -0}}}: 14 must be referenced as first edge by the corresponding face 3 !
         fmt.Println("Test: testUnknownProblem02")
         testUnknownProblem02()
-
-        // works.
-        fmt.Println("Test: testUnknownProblem03")
-        testUnknownProblem03()
 
         // works.
         for i := 0; i < 20; i++ {
@@ -1565,14 +1553,11 @@ func main() {
         // A first edge {-1 22 47 8 {{617.9416262713963 180.47056161414065 0} {-1122.3309707620595 -298.2690982766378 0}}}: 23 must be referenced as first edge by the corresponding face 8 !
         fmt.Println("Test: testUnknownProblem08")
         testUnknownProblem08()
-
-        // works.
-        fmt.Println("Test: testUnknownProblem09")
-        testUnknownProblem09()
-
-        // works.
-        fmt.Println("Test: testUnknownProblem10")
-        testUnknownProblem10()
+        testUnknownProblemSeed(1483370150842201370, 15)
+        testUnknownProblemSeed(1483369884537650258, 20)
+        testUnknownProblemSeed(1483370038194119290, 9)
+        testLinearDepentence01()
+        testUnknownProblemSeed(1483370089898481236, 15)
     }
 
     crashes := false
@@ -1585,43 +1570,16 @@ func main() {
         // On those lists, only prepend-operations will be done [O(1)].
         // If len(list) > 0, we just take the first additional free position. That way, we
         // never get over the max list size and do not get additional time other than O(1).
-        testUnknownProblemSeed(1483370150842201370, 15)
-        testUnknownProblemSeed(1483369884537650258, 20)
+
     }
 
     infLoop := false
 
     if infLoop {
-        testUnknownProblemSeed(1483370038194119290, 9)
-        //testUnknownProblemSeed(1483370089898481236, 15)
-        //testUnknownProblemSeed(1483370130545841965, 15)
+        // wat.
+        testUnknownProblemSeed(1483370130545841965, 15)
     }
 
-    linearDependence := false
-
-    if linearDependence {
-        // A first edge {-1 0 4 1 {{25 510 0} {0 -1000 0}}}: 1 must be referenced as first edge by the corresponding face 1 !
-        fmt.Println("Test: testLinearDepentence01")
-        testLinearDepentence01()
-    }
-
-    randomTests := true
-
-    if randomTests {
-
-        // Origin vertex of edge 4: {0 5 -1 2 {{125.84787995750497 1628.9129170103963 0} {143.0004169065228 3129.33495721706 -0}}} is invalid
-        // Intersection is seemingly directly on a vertex. Kind of undefined stuff here.
-        testUnknownProblemSeed(1489941049442429888, 5)
-
-        //for i := 0; i < 20; i++ {
-        //    fmt.Println("Test: testRandom_", i)
-        //    testRandom(5)
-        //}
-    }
-
-    // works 1/2 with 10 points.
-    // doesn't work at all with >= 20 points!!! Never finishes for none.
-    //testRandom(15)
 
 }
 

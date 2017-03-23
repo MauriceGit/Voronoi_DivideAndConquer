@@ -8,7 +8,7 @@ import (
 )
 
 const (
-    EPS = 0.000000001
+    EPS = 0.00001
 )
 
 var InfinitePoint = Vector{-100000,-100000, -100000}
