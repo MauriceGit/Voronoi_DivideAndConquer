@@ -107,7 +107,7 @@ func drawCircle(m *image.RGBA, posX, posY, radius int, c color.RGBA) {
 }
 
 func (v *Voronoi)createImage(filename string, whole bool) {
-    var w, h int = 5000, 1500
+    var w, h int = 1000, 1000
 
     m := image.NewRGBA(image.Rect(0, 0, w, h))
 
@@ -945,7 +945,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 }*/
 
                 // This line causes lots of trouble...
-                //v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
+                v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
                 fmt.Printf("The twin we are looking at, is: %v\n", v.edges[v.edges[chain.edgeP].ENext].ETwin)
 
                 // Delete the following edge of edgeP
@@ -1584,7 +1584,7 @@ func testRandom(count int) {
 
 func main() {
 
-    working := false
+    working := true
 
     if working {
         testNormal01()
@@ -1675,7 +1675,7 @@ func main() {
     test := true
 
     if test {
-        testUnknownProblem12()
+        //testUnknownProblem12()
     }
 
 }
