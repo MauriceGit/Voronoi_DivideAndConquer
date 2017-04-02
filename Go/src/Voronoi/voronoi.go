@@ -107,7 +107,7 @@ func drawCircle(m *image.RGBA, posX, posY, radius int, c color.RGBA) {
 }
 
 func (v *Voronoi)createImage(filename string, whole bool) {
-    var w, h int = 1000, 1000
+    var w, h int = 5000, 1500
 
     m := image.NewRGBA(image.Rect(0, 0, w, h))
 
@@ -160,6 +160,13 @@ func (v *Voronoi)createImage(filename string, whole bool) {
 
             if edge == (Edge{}) {
                 //continue
+            }
+
+            if i == 8 || i == 9 {
+                tmpC := color.RGBA{0,0,0,255}
+                gc.SetStrokeColor(tmpC)
+            } else {
+                gc.SetStrokeColor(c)
             }
 
             //fmt.Printf("From %v|%v ----> %v|%v\n", edge.Pos.X*10., float64(h) - edge.Pos.Y*10., Add(edge.Pos, edge.Dir).X*10., float64(h) - Add(edge.Pos, edge.Dir).Y*10.)
@@ -810,7 +817,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     }
 
     if g_recursions == 7 {
-        drawDividingChain(dividingChain)
+        //drawDividingChain(dividingChain)
     }
 
     return dividingChain
@@ -897,13 +904,14 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                 // This kinda works. Have to further investigate.
 
-                if v.edges[v.edges[chain.edgeP].ENext].VOrigin != vertex {
-                    // This should NEVER happen!
-                    //fmt.Println(vertex, v.edges[v.edges[chain.edgeP].ENext].VOrigin)
 
-                    //fmt.Printf("================> EDGE DELETED 100000: %v \n", v.edges[chain.edgeP].ENext)
-                    //v.edges[v.edges[chain.edgeP].ENext] = emptyE
-                } else {
+                if v.edges[chain.edgeP].ENext != EmptyEdge && v.edges[v.edges[chain.edgeP].ENext] == emptyE {
+                    fmt.Printf("..................................OK, there is something seriously wrong here.\n")
+                    //v.edges[chain.edgeP].ENext = EmptyEdge
+                }
+
+
+                if v.edges[v.edges[chain.edgeP].ENext] != emptyE {
                     fmt.Printf("================> EDGE DELETED 2: %v \n", v.edges[v.edges[chain.edgeP].ENext].ETwin)
 
                     if v.faces[v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin].FFace].EEdge == v.edges[v.edges[chain.edgeP].ENext].ETwin {
@@ -919,6 +927,26 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
 
                 }
+
+                if v.edges[v.edges[chain.edgeP].ENext].ENext != EmptyEdge {
+                    fmt.Printf("Found some stuff. P\n")
+
+                    v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin].VOrigin = EmptyVertex
+                    v.vertices[v.edges[v.edges[v.edges[chain.edgeP].ENext].ENext].VOrigin] = emptyV
+                    v.edges[v.edges[v.edges[v.edges[chain.edgeP].ENext].ENext].ETwin] = emptyE
+                    v.edges[v.edges[v.edges[chain.edgeP].ENext].ENext] = emptyE
+                }
+
+                /*if v.faces[v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin].FFace].EEdge == v.edges[v.edges[chain.edgeP].ENext].ETwin {
+                    // The edge is referenced as first edge. Might need some extra work here...
+                    fmt.Printf("The edge is referenced as first edge. Might need some extra work here...\n")
+                    // YES YES YES WAY TO GO MAN!!!!!
+                    v.faces[v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin].FFace].EEdge = v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin].ENext
+                }*/
+
+                // This line causes lots of trouble...
+                //v.edges[v.edges[v.edges[chain.edgeP].ENext].ETwin] = emptyE
+                fmt.Printf("The twin we are looking at, is: %v\n", v.edges[v.edges[chain.edgeP].ENext].ETwin)
 
                 // Delete the following edge of edgeP
                 fmt.Printf("================> EDGE DELETED 3: %v \n", v.edges[chain.edgeP].ENext)
@@ -959,20 +987,26 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 fmt.Printf("OK. edgeToBeDeleted: %v. Its face: %v. edgeQ's face: %v\n", edgeToBeDeleted, v.edges[edgeToBeDeleted].FFace, v.edges[chain.edgeQ].FFace)
                 fmt.Printf("And face q points to what edge: %v \n", v.faces[chain.q].EEdge)
 
-                if edgeToBeDeleted == v.faces[chain.q].EEdge {
-                    fmt.Printf("Probably found it ?!?\n")
-                    v.faces[chain.q].EEdge = v.edges[edgeToBeDeleted].ENext
+                if edgeToBeDeleted == v.faces[v.edges[edgeToBeDeleted].FFace].EEdge {
+                    fmt.Printf("Probably found it ?!? Q\n")
+                    //v.faces[v.edges[edgeToBeDeleted].FFace].EEdge = v.edges[edgeToBeDeleted].ENext
+                    v.faces[v.edges[edgeToBeDeleted].FFace].EEdge = heEdgeDown
                 }
 
+                if v.edges[v.edges[edgeToBeDeleted].ETwin].ENext != EmptyEdge {
+                    fmt.Printf("Found some stuff.\n")
+                }
+
+
+
                 // Delete Edge
-                v.edges[v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext].ETwin] = emptyE
+                v.edges[edgeToBeDeleted] = emptyE
                 // Delete Edge
                 v.edges[v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext] = emptyE
+                v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext = EmptyEdge
                 // Delete Vertex
                 v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
 
-                // Remove Reference of ENext
-                v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext = EmptyEdge
                 // Remove Reference of VOrigin
                 //v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].VOrigin = EmptyVertex
 
@@ -1470,6 +1504,31 @@ func testUnknownProblem11() {
     v.createImage("test_unknown_problem_11", true)
 }
 
+func testUnknownProblem12() {
+    count := 9
+    var seed int64 = 1483370038194119290
+    r := rand.New(rand.NewSource(seed))
+    var pointList PointList
+
+    for i:= 0; i < count; i++ {
+        v := Vector{r.Float64()*50.+25., r.Float64()*50.+25., 0}
+        pointList = append(pointList, v)
+    }
+
+    sort.Sort(pointList)
+    pointList = pointList[1:]
+
+    //pointList = pointList[4:]
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_unknown_problem_12", true)
+}
+
 func testUnknownProblemSeed(seed int64, count int) {
     r := rand.New(rand.NewSource(seed))
     var pointList PointList
@@ -1540,12 +1599,16 @@ func main() {
         testUnknownProblemSeed(1489941049442429888, 5)
         testUnknownProblem01()
         testUnknownProblem08()
+        testUnknownProblem11()
+        testUnknownProblem06()
+        testUnknownProblem07()
     }
 
     toBeVerified := false
 
     if toBeVerified {
 
+        testLinearDepentence01()
         // works.
         // A first edge {-1 0 6 1 {{35 510 0} {0 -1000 0}}}: 1 must be referenced as first edge by the corresponding face 1 !
         fmt.Println("Test: testLinearDepentence02")
@@ -1578,21 +1641,14 @@ func main() {
         fmt.Println("Test: testUnknownProblem05")
         testUnknownProblem05()
 
-        // works.
-        // A first edge {-1 18 45 9 {{654.9199431386028 247.98222847916995 0} {-1179.0839242068148 -429.7651742821415 0}}}: 19 must be referenced as first edge by the corresponding face 9 !
-        fmt.Println("Test: testUnknownProblem06")
-        testUnknownProblem06()
-
-        // works.
-        // A first edge {-1 21 43 7 {{-136.0905914267441 176.06086890737805 0} {-399.7689142491673 270.81007412041345 -0}}}: 20 must be referenced as first edge by the corresponding face 7 !
-        fmt.Println("Test: testUnknownProblem07")
-        testUnknownProblem07()
-
-
+        // Edge 1: {6 0 26 2 {{241.90357878309425 103.13635491102873 0} {-427.54352793789894 -125.38564346969068 0}}} has an invalid twin edge
         testUnknownProblemSeed(1483370150842201370, 15)
+        // Origin vertex of edge 52: {15 53 61 12 {{-966.0956011895186 88.82235140422249 0} {-2065.383126920354 85.74944480124458 -0}}} is invalid
         testUnknownProblemSeed(1483369884537650258, 20)
-        testUnknownProblemSeed(1483370038194119290, 9)
-        testLinearDepentence01()
+        // Edge 1: {-1 0 6 1 {{-1384.3855715982836 588.3540083546337 0} {2833.664846401301 -1083.2196592485043 0}}} has an invalid twin edge
+        // A first edge {-1 9 1 1 {{-1857.7515712116654 1020.8019340903381 0} {-3828.369061351053 1953.236108727775 -0}}}: 8 must be referenced as first edge by the corresponding face 1!
+        testUnknownProblem12()
+        // Edge 1: {0 0 22 2 {{-591.7026652340533 258.10677940190504 0} {1243.9887414797277 -408.0003716714156 0}}} has an invalid twin edge
         testUnknownProblemSeed(1483370089898481236, 15)
     }
 
@@ -1619,7 +1675,7 @@ func main() {
     test := true
 
     if test {
-        testUnknownProblem11()
+        testUnknownProblem12()
     }
 
 }
