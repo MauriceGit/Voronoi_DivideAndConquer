@@ -1501,7 +1501,7 @@ func testUnknownProblemSeed(seed int64, count int) {
 
     sort.Sort(pointList)
 
-    //pointList = pointList[:len(pointList)/2]
+    pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
     v.pprint()
