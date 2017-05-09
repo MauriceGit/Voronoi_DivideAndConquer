@@ -810,7 +810,10 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     lastVertex   := EmptyVertex
 
     lastQRemove  := EmptyEdge
-    //lastQRemoveF := EmptyFace
+    lastQVertex  := EmptyVertex
+
+    potFirstEdgeOfQ := EmptyEdge
+    lastQFace    := EmptyFace
 
     chainList := v.extractDividingChain(left, right)
 
@@ -842,11 +845,9 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         // For the very first dividing chain element holds, that the face q has to update
         // its edge reference to this down-edge. No matter what.
         if i == 0 {
-            //fmt.Printf("update edge (%v) for face: %v for the first dividing chain element\n", heEdgeDown, chain.q)
             v.faces[chain.q].EEdge = heEdgeDown
         }
 
-        // TO BE VERIFIED
         if i == len(chainList)-1 {
             //fmt.Printf("update edge (%v) for face: %v for the first dividing chain element\n", heEdgeDown, chain.q)
             v.faces[chain.p].EEdge = heEdgeUp
@@ -854,6 +855,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
         // If edgeQ is the current edge for the face q and we have an intersection with
         // edgeQ, the new first edge for the face q must be edgeQ!
+        // Simple case!
         if chain.edgeQ != EmptyEdge && v.faces[chain.q].EEdge == chain.edgeQ {
             v.faces[chain.q].EEdge = heEdgeDown
         }
@@ -866,7 +868,13 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             v.faces[chain.p].EEdge = heEdgeUp
         }
 
-        lastVertex = heVertex
+        // If we just enter a q-face polygon for the first time!
+        // Then we save the heEdgeDown because it is a (very) good candidate for the first edge of q in times of crisis.
+        if i > 0 && chainList[i-1].edgeQ == EmptyEdge && chain.edgeQ != EmptyEdge {
+            potFirstEdgeOfQ = heEdgeDown
+            lastQFace = chain.q
+            fmt.Printf("q == %v, potFirstEdgeOfQ == %v\n", lastQFace, potFirstEdgeOfQ)
+        }
 
         // Removing stuff!
         if chain.edgeP != EmptyEdge {
@@ -911,43 +919,69 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             // Delete vertices that overlap with the other side (to the right)!
             vertex := v.edges[chain.edgeQ].VOrigin
             if vertex.Valid() && v.vertices[vertex] != emptyV {
-                fmt.Printf("    ----> Found a vertex that has do be deleted (Q) (v-index: %v)\n", vertex)
+                fmt.Printf("    ----> Found a vertex that has do be deleted (Q:%v) (v-index: %v)\n", chain.q, vertex)
+                fmt.Printf("    q.EEdge: %v\n", v.faces[chain.q].EEdge)
+                test := true
 
-                edgeRef := v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin
-                edgeToBeDeleted := v.edges[v.edges[edgeRef].ENext].ETwin
+                if test {
 
-                //lastQRemove  = v.edges[v.edges[chain.edgeQ].ETwin].ENext
+                    // reset old states
+                    if lastQRemove == chain.edgeQ {
+                        fmt.Printf("lastQRemove set to EmptyEdge\n")
+                        lastQRemove = EmptyEdge
+                    }
 
-                //v.faces[chain.q].EEdge = heEdgeDown
+                    // remove edges
+                    if lastQRemove != EmptyEdge {
+                        fmt.Printf("Condition: %v || %v\n", v.edges[lastQRemove].ETwin == v.faces[chain.q].EEdge, lastQRemove == v.faces[chain.q].EEdge)
+                        // well, here it is, our crisis.
+                        if v.edges[lastQRemove].ETwin == v.faces[chain.q].EEdge || lastQRemove == v.faces[chain.q].EEdge {
+                            fmt.Printf("Nearly lost the reference to the first face of q.\n")
+                            v.faces[chain.q].EEdge = potFirstEdgeOfQ
+                        }
+                        fmt.Printf("DELETE E: %v\n", v.edges[lastQRemove].ETwin)
+                        v.edges[v.edges[lastQRemove].ETwin] = emptyE
+                        fmt.Printf("DELETE E: %v\n", lastQRemove)
+                        v.edges[lastQRemove] = emptyE
+                    }
+                    // remove old vertex anywhay
+                    if lastQVertex != EmptyVertex {
+                        fmt.Printf("DELETE V: %v\n", lastQVertex)
+                        v.vertices[lastQVertex] = emptyV
+                    }
 
-                //fmt.Printf("lastQRemove: %v, %v\n", lastQRemove, v.edges[lastQRemove].ETwin)
+                    // set new states
+                    lastQRemove = v.edges[v.edges[chain.edgeQ].ETwin].ENext
 
-                if edgeToBeDeleted == v.faces[v.edges[edgeToBeDeleted].FFace].EEdge {
-                    v.faces[v.edges[edgeToBeDeleted].FFace].EEdge = heEdgeDown
-                }
+                    if vertex != lastQVertex {
+                        lastQVertex = vertex
+                    } else {
+                        lastQVertex = EmptyVertex
+                    }
 
+                } else {
 
-                if g_recursions == 14 && v.edges[edgeToBeDeleted].ETwin == 1 {
+                    edgeRef := v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin
+                    edgeToBeDeleted := v.edges[v.edges[edgeRef].ENext].ETwin
 
-                }
-
-                // Delete Edge
-                //fmt.Printf("q edgeRef: %v\n", edgeRef)
-                //v.edges[edgeRef].ENext = EmptyEdge
-
-                fmt.Printf("q delete edge: %v\n", v.edges[edgeToBeDeleted].ETwin)
-                v.edges[v.edges[edgeToBeDeleted].ETwin] = emptyE
-                // Delete Edge
-                fmt.Printf("q delete edge: %v\n", edgeToBeDeleted)
-                v.edges[edgeToBeDeleted] = emptyE
-                // Delete Vertex
-                v.vertices[vertex] = emptyV
-
-                // If i accidently delete the edge referenced by the face q.
-                if v.edges[v.faces[chain.q].EEdge] == emptyE {
-                    fmt.Printf("Accidently delete referred edge.\n")
+                    fmt.Printf("SETFACE: %v --> %v\n", chain.q, heEdgeDown)
                     v.faces[chain.q].EEdge = heEdgeDown
+
+                    // Delete Edge
+                    //fmt.Printf("q edgeRef: %v\n", edgeRef)
+                    //v.edges[edgeRef].ENext = EmptyEdge
+
+                    fmt.Printf("DELETE E: %v\n", v.edges[edgeToBeDeleted].ETwin)
+                    v.edges[v.edges[edgeToBeDeleted].ETwin] = emptyE
+                    // Delete Edge
+                    fmt.Printf("DELETE E: %v\n", edgeToBeDeleted)
+                    v.edges[edgeToBeDeleted] = emptyE
+                    // Delete Vertex
+                    fmt.Printf("DELETE V: %v\n", vertex)
+                    v.vertices[vertex] = emptyV
+
                 }
+
 
 
             }
@@ -970,16 +1004,42 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             lastDownEdge = heEdgeDown
         }
 
+        lastVertex = heVertex
+
     }
 
-    if false && lastQRemove != EmptyEdge && v.edges[lastQRemove] != emptyE {
-        fmt.Printf("Remove very last edge!\n")
-        if v.vertices[v.edges[lastQRemove].VOrigin] != emptyV {
-            fmt.Printf("Remove very last vertex! (???)\n")
-            v.vertices[v.edges[lastQRemove].VOrigin] = emptyV
+    // remove edges
+    if lastQRemove != EmptyEdge {
+        // well, here it is, our crisis.
+        //lastQ := v.edges[v.edges[lastQRemove].ETwin].FFace
+        lastQ := lastQFace
+
+        //fmt.Printf("is it true? %v\n", lastQ == lastQFace)
+
+        if v.edges[lastQRemove].ETwin == v.faces[lastQ].EEdge || lastQRemove == v.faces[lastQ].EEdge {
+            //fmt.Printf("Nearly lost the reference to the first face of q.\n")
+            fmt.Printf("LAST SETFACE: %v --> %v\n", lastQ, potFirstEdgeOfQ)
+            v.faces[lastQ].EEdge = potFirstEdgeOfQ
         }
+
+        endangeredFace := v.edges[v.edges[lastQRemove].ETwin].FFace
+        fmt.Printf("face: %v\n", endangeredFace)
+
+        fmt.Printf("LAST DELETE E: %v\n", v.edges[lastQRemove].ETwin)
         v.edges[v.edges[lastQRemove].ETwin] = emptyE
+        fmt.Printf("LAST DELETE E: %v\n", lastQRemove)
         v.edges[lastQRemove] = emptyE
+
+        if v.edges[v.faces[endangeredFace].EEdge] == emptyE {
+            v.faces[endangeredFace].EEdge = lastDownEdge
+        }
+
+
+    }
+    // remove old vertex anywhay
+    if lastQVertex != EmptyVertex {
+        fmt.Printf("LAST DELETE V: %v\n", lastQVertex)
+        v.vertices[lastQVertex] = emptyV
     }
 
     fmt.Printf("FINISHED MERGE OF %v AND %v\n\n", left, right)
@@ -1501,7 +1561,7 @@ func testUnknownProblemSeed(seed int64, count int) {
 
     sort.Sort(pointList)
 
-    pointList = pointList[:len(pointList)/2]
+    //pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
     v.pprint()
