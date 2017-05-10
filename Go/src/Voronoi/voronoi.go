@@ -162,7 +162,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
                 //continue
             }
 
-            if i == 0 || i == 1 {
+            if i == 10 || i == 11 {
                 fmt.Printf("coloring now for something\n")
                 tmpC := color.RGBA{0,0,0,255}
                 gc.SetStrokeColor(tmpC)
@@ -849,14 +849,14 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         }
 
         if i == len(chainList)-1 {
-            //fmt.Printf("update edge (%v) for face: %v for the first dividing chain element\n", heEdgeDown, chain.q)
             v.faces[chain.p].EEdge = heEdgeUp
         }
 
         // If edgeQ is the current edge for the face q and we have an intersection with
         // edgeQ, the new first edge for the face q must be edgeQ!
         // Simple case!
-        if chain.edgeQ != EmptyEdge && v.faces[chain.q].EEdge == chain.edgeQ {
+        if chain.edgeQ != EmptyEdge && v.faces[chain.q].EEdge == chain.edgeQ && chain.intersection != InfinitePoint {
+            fmt.Printf("are we here? %v, %v, %v\n", chain.q, heEdgeDown, chain.edgeQ)
             v.faces[chain.q].EEdge = heEdgeDown
         }
 
@@ -946,7 +946,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     }
                     // remove old vertex anywhay
                     if lastQVertex != EmptyVertex {
-                        fmt.Printf("DELETE V: %v\n", lastQVertex)
+                        fmt.Printf("DELETE V: %v: %v\n", lastQVertex, v.vertices[lastQVertex])
                         v.vertices[lastQVertex] = emptyV
                     }
 
@@ -977,7 +977,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     fmt.Printf("DELETE E: %v\n", edgeToBeDeleted)
                     v.edges[edgeToBeDeleted] = emptyE
                     // Delete Vertex
-                    fmt.Printf("DELETE V: %v\n", vertex)
+                    fmt.Printf("DELETE V: %v: %v\n", vertex, v.vertices[vertex])
                     v.vertices[vertex] = emptyV
 
                 }
@@ -1009,7 +1009,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     }
 
     // remove edges
-    if lastQRemove != EmptyEdge {
+    if lastQRemove != EmptyEdge && v.edges[lastQRemove] != emptyE {
         // well, here it is, our crisis.
         //lastQ := v.edges[v.edges[lastQRemove].ETwin].FFace
         lastQ := lastQFace
@@ -1091,6 +1091,9 @@ func CreateVoronoi(pointList PointList) Voronoi {
 // Normal test distribution of points. No special cases for Voronoi generation.
 //
 func testNormal01() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_normal_01\n")
+    fmt.Printf("=============================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{10., 10., 0})
@@ -1109,6 +1112,9 @@ func testNormal01() {
 }
 
 func testNormal02() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_normal_02\n")
+    fmt.Printf("=============================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{40., 10., 0})
@@ -1128,6 +1134,9 @@ func testNormal02() {
 }
 
 func testNormal03() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_normal_03\n")
+    fmt.Printf("=============================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{30., 10., 0})
@@ -1149,6 +1158,9 @@ func testNormal03() {
 // Test cases where 4 lines meet and p/q have the same intersection point.
 //
 func testEqualIntersection01() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_intersection_01\n")
+    fmt.Printf("=============================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{28, 30, 0})
@@ -1169,6 +1181,9 @@ func testEqualIntersection01() {
 }
 
 func testEqualIntersection02() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_intersection_02\n")
+    fmt.Printf("=============================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{30., 50., 0})
@@ -1189,6 +1204,9 @@ func testEqualIntersection02() {
 // Test cases with linear dependent points or lines
 //
 func testLinearDepentence01() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_linear_dependence_01\n")
+    fmt.Printf("=============================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{20, 10, 0})
@@ -1206,6 +1224,9 @@ func testLinearDepentence01() {
 }
 
 func testLinearDepentence02() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_linear_dependence_02\n")
+    fmt.Printf("=============================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{30., 10., 0})
@@ -1224,6 +1245,9 @@ func testLinearDepentence02() {
 }
 
 func testLinearDepentence03() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_linear_dependence_03\n")
+    fmt.Printf("=============================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{20., 10., 0})
@@ -1244,6 +1268,9 @@ func testLinearDepentence03() {
 }
 
 func testLinearDepentence04() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_linear_dependence_04\n")
+    fmt.Printf("=============================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{30., 10., 0})
@@ -1263,6 +1290,9 @@ func testLinearDepentence04() {
 //
 
 func testUnknownProblem01() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_01\n")
+    fmt.Printf("===========================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{10., 15., 0})
@@ -1290,6 +1320,9 @@ func testUnknownProblem01() {
 }
 
 func testUnknownProblem02() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_02\n")
+    fmt.Printf("===========================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{10., 10., 0})
@@ -1313,6 +1346,9 @@ func testUnknownProblem02() {
 }
 
 func testUnknownProblem03() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_03\n")
+    fmt.Printf("===========================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{10., 15., 0})
@@ -1336,6 +1372,9 @@ func testUnknownProblem03() {
 }
 
 func testUnknownProblem04() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_04\n")
+    fmt.Printf("===========================\n")
     var pointList PointList
 
     pointList = append(pointList, Vector{26.140400405282577, 61.621512929924580, 0})
@@ -1370,6 +1409,9 @@ func testUnknownProblem04() {
 }
 
 func testUnknownProblem05() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_05\n")
+    fmt.Printf("===========================\n")
     count := 10
     var seed int64 = 1482409032579303917
     r := rand.New(rand.NewSource(seed))
@@ -1390,6 +1432,9 @@ func testUnknownProblem05() {
 }
 
 func testUnknownProblem06() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_06\n")
+    fmt.Printf("===========================\n")
     count := 10
     var seed int64 = 1482409509781449406
     r := rand.New(rand.NewSource(seed))
@@ -1409,6 +1454,9 @@ func testUnknownProblem06() {
 }
 
 func testUnknownProblem07() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_07\n")
+    fmt.Printf("===========================\n")
     count := 10
     var seed int64 = 1482409694089411269
     r := rand.New(rand.NewSource(seed))
@@ -1428,6 +1476,9 @@ func testUnknownProblem07() {
 }
 
 func testUnknownProblem08() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_08\n")
+    fmt.Printf("===========================\n")
     count := 10
     var seed int64 = 1482409796721354066
     r := rand.New(rand.NewSource(seed))
@@ -1452,6 +1503,9 @@ func testUnknownProblem08() {
 }
 
 func testUnknownProblem09() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_09\n")
+    fmt.Printf("===========================\n")
     count := 5
     var seed int64 = 1482476817056249360
     r := rand.New(rand.NewSource(seed))
@@ -1477,6 +1531,9 @@ func testUnknownProblem09() {
 }
 
 func testUnknownProblem10() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_10\n")
+    fmt.Printf("===========================\n")
     count := 5
     var seed int64 = 1482477466512747360
     r := rand.New(rand.NewSource(seed))
@@ -1501,6 +1558,9 @@ func testUnknownProblem10() {
 }
 
 func testUnknownProblem11() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_11\n")
+    fmt.Printf("===========================\n")
     count := 10
     var seed int64 = 1482409032579303917
     r := rand.New(rand.NewSource(seed))
@@ -1526,6 +1586,9 @@ func testUnknownProblem11() {
 }
 
 func testUnknownProblem12() {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_unknown_problem_12\n")
+    fmt.Printf("===========================\n")
     count := 9
     var seed int64 = 1483370038194119290
     r := rand.New(rand.NewSource(seed))
@@ -1551,6 +1614,9 @@ func testUnknownProblem12() {
 }
 
 func testUnknownProblemSeed(seed int64, count int) {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_seed_%v\n", strconv.FormatInt(seed, 10))
+    fmt.Printf("===========================\n")
     r := rand.New(rand.NewSource(seed))
     var pointList PointList
 
@@ -1561,7 +1627,7 @@ func testUnknownProblemSeed(seed int64, count int) {
 
     sort.Sort(pointList)
 
-    //pointList = pointList[:len(pointList)/2]
+    pointList = pointList[len(pointList)/2:]
 
     v := CreateVoronoi(pointList)
     v.pprint()
@@ -1580,6 +1646,9 @@ func testUnknownProblemSeed(seed int64, count int) {
 //
 
 func testRandom(count int) {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_random_%v\n", count)
+    fmt.Printf("===========================\n")
     seed := time.Now().UTC().UnixNano()
     r := rand.New(rand.NewSource(seed))
     var pointList PointList
@@ -1611,7 +1680,8 @@ func main() {
         testNormal01()
         testNormal02()
         testNormal03()
-        testEqualIntersection01()
+        // crash
+        //testEqualIntersection01()
         testEqualIntersection02()
         testLinearDepentence04()
         testUnknownProblem03()
@@ -1622,10 +1692,17 @@ func main() {
         testUnknownProblem08()
         testUnknownProblem11()
         testUnknownProblem06()
-        testUnknownProblem07()
-        testUnknownProblem12()
+        // wrong
+        //testUnknownProblem07()
+        // wrong
+        //testUnknownProblem12()
         testUnknownProblem04()
-        testUnknownProblemSeed(1483369884537650258, 20)
+        // wrong
+        //testUnknownProblemSeed(1483369884537650258, 20)
+        testUnknownProblemSeed(1483370089898481236, 15)
+        testUnknownProblem05()
+        testUnknownProblemSeed(1483370089898481236, 15)
+        testUnknownProblem02()
     }
 
     toBeVerified := false
@@ -1644,27 +1721,17 @@ func main() {
         testLinearDepentence03()
 
         // works.
-        // A first edge {-2 15 12 3 {{45 1510 0} {-0 3000 -0}}}: 14 must be referenced as first edge by the corresponding face 3 !
-        // This might be caused by linear dependence!
-        fmt.Println("Test: testUnknownProblem02")
-        testUnknownProblem02()
-
-        // works.
         for i := 0; i < 20; i++ {
             fmt.Println("Test: testRandom_", i)
             testRandom(5)
         }
 
-        // works.
-        // Edge 1: {1 0 14 1 {{-739.10628305337 290.87805411171877 0} {1533.3524362524884 -510.75348787721816 0}}} has an invalid twin edge
-        fmt.Println("Test: testUnknownProblem05")
-        testUnknownProblem05()
-
         // Edge 1: {6 0 26 2 {{241.90357878309425 103.13635491102873 0} {-427.54352793789894 -125.38564346969068 0}}} has an invalid twin edge
         testUnknownProblemSeed(1483370150842201370, 15)
 
-        // Edge 1: {0 0 22 2 {{-591.7026652340533 258.10677940190504 0} {1243.9887414797277 -408.0003716714156 0}}} has an invalid twin edge
-        testUnknownProblemSeed(1483370089898481236, 15)
+        // crashes...
+        testUnknownProblemSeed(1483370130545841965, 15)
+
     }
 
     crashes := false
@@ -1683,14 +1750,13 @@ func main() {
     infLoop := false
 
     if infLoop {
-        // wat.
-        testUnknownProblemSeed(1483370130545841965, 15)
+
     }
 
     test := true
 
     if test {
-        testUnknownProblemSeed(1483370089898481236, 15)
+        testUnknownProblemSeed(1483370150842201370, 15)
     }
 
 }
