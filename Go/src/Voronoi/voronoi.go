@@ -946,7 +946,9 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     // Save a reference to THIS special edge. It will be removed in the last step.
                     if qFirstContact {
                         //specialQEdge = v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext
+                        fmt.Printf("1\n")
                         specialQEdges = append(specialQEdges, v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext)
+                        fmt.Printf("2\n")
                     }
 
                     // remove edges
@@ -1700,7 +1702,7 @@ func testRandom(count int) {
 
 func main() {
 
-    working := false
+    working := true
 
     if working {
         testNormal01()
@@ -1779,9 +1781,10 @@ func main() {
 
     }
 
-    test := true
+    test := false
 
     if test {
+        // infinite loop? COME ON.
         testUnknownProblemSeed(1483370150842201370, 15)
     }
 
