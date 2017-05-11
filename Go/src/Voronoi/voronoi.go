@@ -789,7 +789,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
     }
 
-    if g_recursions == 14 {
+    if g_recursions == 7 {
         //drawDividingChain(dividingChain)
     }
 
@@ -814,6 +814,10 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
     potFirstEdgeOfQ := EmptyEdge
     lastQFace    := EmptyFace
+
+    qFirstContact := false
+    //specialQEdge := EmptyEdge
+    var specialQEdges []EdgeIndex
 
     chainList := v.extractDividingChain(left, right)
 
@@ -873,6 +877,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         if i > 0 && chainList[i-1].edgeQ == EmptyEdge && chain.edgeQ != EmptyEdge {
             potFirstEdgeOfQ = heEdgeDown
             lastQFace = chain.q
+            qFirstContact = true
             fmt.Printf("q == %v, potFirstEdgeOfQ == %v\n", lastQFace, potFirstEdgeOfQ)
         }
 
@@ -929,6 +934,19 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     if lastQRemove == chain.edgeQ {
                         fmt.Printf("lastQRemove set to EmptyEdge\n")
                         lastQRemove = EmptyEdge
+                    }
+
+                    // THIS
+                    //   \  /x
+                    //    \/
+                    //    | /x
+                    //     /
+                    //     \
+                    //      \x
+                    // Save a reference to THIS special edge. It will be removed in the last step.
+                    if qFirstContact {
+                        //specialQEdge = v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext
+                        specialQEdges = append(specialQEdges, v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext)
                     }
 
                     // remove edges
@@ -1005,6 +1023,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         }
 
         lastVertex = heVertex
+        qFirstContact = false
 
     }
 
@@ -1033,13 +1052,20 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         if v.edges[v.faces[endangeredFace].EEdge] == emptyE {
             v.faces[endangeredFace].EEdge = lastDownEdge
         }
-
-
     }
     // remove old vertex anywhay
     if lastQVertex != EmptyVertex {
         fmt.Printf("LAST DELETE V: %v\n", lastQVertex)
         v.vertices[lastQVertex] = emptyV
+    }
+    // potentially remove the special edge of q
+    for _,e := range specialQEdges  {
+        if e != EmptyEdge && v.edges[e] != emptyE {
+            fmt.Printf("SPECIAL DELETE E: %v\n", v.edges[e].ETwin)
+            v.edges[v.edges[e].ETwin] = emptyE
+            fmt.Printf("SPECIAL DELETE E: %v\n", e)
+            v.edges[e] = emptyE
+        }
     }
 
     fmt.Printf("FINISHED MERGE OF %v AND %v\n\n", left, right)
