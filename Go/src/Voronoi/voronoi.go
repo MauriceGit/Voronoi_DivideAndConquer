@@ -1717,7 +1717,7 @@ func main() {
         testUnknownProblem10()
         testUnknownProblemSeed(1489941049442429888, 5)
         testUnknownProblem01()
-        testUnknownProblem08()
+        //testUnknownProblem08()
         testUnknownProblem11()
         testUnknownProblem06()
         // wrong
@@ -1728,7 +1728,7 @@ func main() {
         // wrong
         //testUnknownProblemSeed(1483369884537650258, 20)
         testUnknownProblemSeed(1483370089898481236, 15)
-        testUnknownProblem05()
+        //testUnknownProblem05()
         testUnknownProblemSeed(1483370089898481236, 15)
         testUnknownProblem02()
     }
