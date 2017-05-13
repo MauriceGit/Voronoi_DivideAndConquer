@@ -874,7 +874,8 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
         // If we just enter a q-face polygon for the first time!
         // Then we save the heEdgeDown because it is a (very) good candidate for the first edge of q in times of crisis.
-        if i > 0 && chainList[i-1].edgeQ == EmptyEdge && chain.edgeQ != EmptyEdge {
+        //if i > 0 && chainList[i-1].edgeQ == EmptyEdge && chain.edgeQ != EmptyEdge {
+        if (i == 0 || chainList[i-1].q != chain.q) && chain.edgeQ != EmptyEdge {
             potFirstEdgeOfQ = heEdgeDown
             lastQFace = chain.q
             qFirstContact = true
@@ -883,7 +884,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
         // Removing stuff!
         if chain.edgeP != EmptyEdge {
-            // Delete vertices that overlap with the other side (to the left)!
+            // Delete vertices that overlap with the other side (to the right)!
             vertex := v.edges[v.edges[chain.edgeP].ETwin].VOrigin
 
             if vertex.Valid() && v.vertices[vertex] != emptyV {
@@ -921,7 +922,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
         // Removing Stuff
         if chain.edgeQ != EmptyEdge {
-            // Delete vertices that overlap with the other side (to the right)!
+            // Delete vertices that overlap with the other side (to the left)!
             vertex := v.edges[chain.edgeQ].VOrigin
             if vertex.Valid() && v.vertices[vertex] != emptyV {
                 fmt.Printf("    ----> Found a vertex that has do be deleted (Q:%v) (v-index: %v)\n", chain.q, vertex)
@@ -945,10 +946,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     //      \x
                     // Save a reference to THIS special edge. It will be removed in the last step.
                     if qFirstContact {
-                        //specialQEdge = v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext
-                        fmt.Printf("1\n")
                         specialQEdges = append(specialQEdges, v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext)
-                        fmt.Printf("2\n")
                     }
 
                     // remove edges
@@ -1034,8 +1032,6 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         // well, here it is, our crisis.
         //lastQ := v.edges[v.edges[lastQRemove].ETwin].FFace
         lastQ := lastQFace
-
-        //fmt.Printf("is it true? %v\n", lastQ == lastQFace)
 
         if v.edges[lastQRemove].ETwin == v.faces[lastQ].EEdge || lastQRemove == v.faces[lastQ].EEdge {
             //fmt.Printf("Nearly lost the reference to the first face of q.\n")
@@ -1655,7 +1651,8 @@ func testUnknownProblemSeed(seed int64, count int) {
 
     sort.Sort(pointList)
 
-    //pointList = pointList[len(pointList)/2:]
+    pointList = pointList[len(pointList)/2:]
+    //pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
     v.pprint()
@@ -1702,7 +1699,7 @@ func testRandom(count int) {
 
 func main() {
 
-    working := true
+    working := false
 
     if working {
         testNormal01()
@@ -1781,7 +1778,7 @@ func main() {
 
     }
 
-    test := false
+    test := true
 
     if test {
         // infinite loop? COME ON.
