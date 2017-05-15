@@ -162,7 +162,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
                 //continue
             }
 
-            if i == 10 || i == 11 {
+            if i == 12 || i == 13 {
                 fmt.Printf("coloring now for something\n")
                 tmpC := color.RGBA{0,0,0,255}
                 gc.SetStrokeColor(tmpC)
@@ -815,14 +815,18 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     potFirstEdgeOfQ := EmptyEdge
     lastQFace    := EmptyFace
 
+    gotNewQ      := true
+
     qFirstContact := false
-    //specialQEdge := EmptyEdge
     var specialQEdges []EdgeIndex
 
     chainList := v.extractDividingChain(left, right)
 
     // Iterating through the dividing chain and actually merge the voronois.
     for i,chain := range chainList {
+
+        gotNewQ = i == 0 || chain.edgeQ != EmptyEdge
+
         fmt.Printf("i == %v\n", i)
         heVertex := EmptyVertex
         if chain.intersection != (Vector{}) {
@@ -874,12 +878,10 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
         // If we just enter a q-face polygon for the first time!
         // Then we save the heEdgeDown because it is a (very) good candidate for the first edge of q in times of crisis.
-        //if i > 0 && chainList[i-1].edgeQ == EmptyEdge && chain.edgeQ != EmptyEdge {
-        if (i == 0 || chainList[i-1].q != chain.q) && chain.edgeQ != EmptyEdge {
+        if gotNewQ {
+            //fmt.Printf("Very first time entering a new Q-Polygon!\n")
             potFirstEdgeOfQ = heEdgeDown
-            lastQFace = chain.q
             qFirstContact = true
-            fmt.Printf("q == %v, potFirstEdgeOfQ == %v\n", lastQFace, potFirstEdgeOfQ)
         }
 
         // Removing stuff!
@@ -927,82 +929,63 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             if vertex.Valid() && v.vertices[vertex] != emptyV {
                 fmt.Printf("    ----> Found a vertex that has do be deleted (Q:%v) (v-index: %v)\n", chain.q, vertex)
                 fmt.Printf("    q.EEdge: %v\n", v.faces[chain.q].EEdge)
-                test := true
 
-                if test {
-
-                    // reset old states
-                    if lastQRemove == chain.edgeQ {
-                        fmt.Printf("lastQRemove set to EmptyEdge\n")
-                        lastQRemove = EmptyEdge
-                    }
-
-                    // THIS
-                    //   \  /x
-                    //    \/
-                    //    | /x
-                    //     /
-                    //     \
-                    //      \x
-                    // Save a reference to THIS special edge. It will be removed in the last step.
-                    if qFirstContact {
-                        specialQEdges = append(specialQEdges, v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext)
-                    }
-
-                    // remove edges
-                    if lastQRemove != EmptyEdge {
-                        fmt.Printf("Condition: %v || %v\n", v.edges[lastQRemove].ETwin == v.faces[chain.q].EEdge, lastQRemove == v.faces[chain.q].EEdge)
-                        // well, here it is, our crisis.
-                        if v.edges[lastQRemove].ETwin == v.faces[chain.q].EEdge || lastQRemove == v.faces[chain.q].EEdge {
-                            fmt.Printf("Nearly lost the reference to the first face of q.\n")
-                            v.faces[chain.q].EEdge = potFirstEdgeOfQ
-                        }
-                        fmt.Printf("DELETE E: %v\n", v.edges[lastQRemove].ETwin)
-                        v.edges[v.edges[lastQRemove].ETwin] = emptyE
-                        fmt.Printf("DELETE E: %v\n", lastQRemove)
-                        v.edges[lastQRemove] = emptyE
-                    }
-                    // remove old vertex anywhay
-                    if lastQVertex != EmptyVertex {
-                        fmt.Printf("DELETE V: %v: %v\n", lastQVertex, v.vertices[lastQVertex])
-                        v.vertices[lastQVertex] = emptyV
-                    }
-
-                    // set new states
-                    lastQRemove = v.edges[v.edges[chain.edgeQ].ETwin].ENext
-
-                    if vertex != lastQVertex {
-                        lastQVertex = vertex
-                    } else {
-                        lastQVertex = EmptyVertex
-                    }
-
-                } else {
-
-                    edgeRef := v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin
-                    edgeToBeDeleted := v.edges[v.edges[edgeRef].ENext].ETwin
-
-                    fmt.Printf("SETFACE: %v --> %v\n", chain.q, heEdgeDown)
-                    v.faces[chain.q].EEdge = heEdgeDown
-
-                    // Delete Edge
-                    //fmt.Printf("q edgeRef: %v\n", edgeRef)
-                    //v.edges[edgeRef].ENext = EmptyEdge
-
-                    fmt.Printf("DELETE E: %v\n", v.edges[edgeToBeDeleted].ETwin)
-                    v.edges[v.edges[edgeToBeDeleted].ETwin] = emptyE
-                    // Delete Edge
-                    fmt.Printf("DELETE E: %v\n", edgeToBeDeleted)
-                    v.edges[edgeToBeDeleted] = emptyE
-                    // Delete Vertex
-                    fmt.Printf("DELETE V: %v: %v\n", vertex, v.vertices[vertex])
-                    v.vertices[vertex] = emptyV
-
+                // reset old states
+                if lastQRemove == chain.edgeQ {
+                    fmt.Printf("lastQRemove set to EmptyEdge\n")
+                    lastQRemove = EmptyEdge
                 }
 
+                // THIS
+                //   \  /x
+                //    \/
+                //    | /x
+                //     /
+                //     \
+                //      \x
+                // Save a reference to THIS special edge. It will be removed in the last step.
+                if qFirstContact {
+                    tmp := v.edges[v.edges[v.edges[v.edges[chain.edgeQ].ETwin].ENext].ETwin].ENext
+                    if tmp != EmptyEdge && v.edges[tmp].FFace != lastQFace {
+                        fmt.Printf("Adding %v to the list of special edges. His Face: %v, lastQFace: %v, chain.q: %v\n", tmp, v.edges[v.edges[tmp].ETwin].FFace, lastQFace, chain.q)
+                        specialQEdges = append(specialQEdges, tmp)
+                    }
+                }
 
+                // remove edges
+                if lastQRemove != EmptyEdge {
+                    fmt.Printf("Condition: %v || %v\n", v.edges[lastQRemove].ETwin == v.faces[chain.q].EEdge, lastQRemove == v.faces[chain.q].EEdge)
+                    // well, here it is, our crisis.
+                    if v.edges[lastQRemove].ETwin == v.faces[chain.q].EEdge || lastQRemove == v.faces[chain.q].EEdge {
+                        fmt.Printf("Nearly lost the reference to the first face of q.\n")
+                        v.faces[chain.q].EEdge = potFirstEdgeOfQ
+                    }
+                    fmt.Printf("DELETE E: %v\n", v.edges[lastQRemove].ETwin)
+                    v.edges[v.edges[lastQRemove].ETwin] = emptyE
+                    fmt.Printf("DELETE E: %v\n", lastQRemove)
+                    v.edges[lastQRemove] = emptyE
+                }
+                // remove old vertex anyway
+                if lastQVertex != EmptyVertex {
+                    fmt.Printf("DELETE V: %v: %v\n", lastQVertex, v.vertices[lastQVertex])
+                    v.vertices[lastQVertex] = emptyV
+                }
+
+                // set new states
+                lastQRemove = v.edges[v.edges[chain.edgeQ].ETwin].ENext
+
+                if vertex != lastQVertex {
+                    lastQVertex = vertex
+                } else {
+                    lastQVertex = EmptyVertex
+                }
 
             }
+        }
+
+        if chain.edgeQ != EmptyEdge {
+            fmt.Printf("new lastQFace: %v\n", chain.q)
+            lastQFace = chain.q
         }
 
         // Setting States
@@ -1056,6 +1039,9 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         fmt.Printf("LAST DELETE V: %v\n", lastQVertex)
         v.vertices[lastQVertex] = emptyV
     }
+
+    fmt.Printf("special edges: %v\n", specialQEdges)
+
     // potentially remove the special edge of q
     for _,e := range specialQEdges  {
         if e != EmptyEdge && v.edges[e] != emptyE {
@@ -1651,8 +1637,8 @@ func testUnknownProblemSeed(seed int64, count int) {
 
     sort.Sort(pointList)
 
-    pointList = pointList[len(pointList)/2:]
     //pointList = pointList[:len(pointList)/2]
+    //pointList = pointList[len(pointList)/2:]
 
     v := CreateVoronoi(pointList)
     v.pprint()
@@ -1699,14 +1685,13 @@ func testRandom(count int) {
 
 func main() {
 
-    working := false
+    working := true
 
     if working {
         testNormal01()
         testNormal02()
         testNormal03()
-        // crash
-        //testEqualIntersection01()
+        testEqualIntersection01()
         testEqualIntersection02()
         testLinearDepentence04()
         testUnknownProblem03()
@@ -1714,19 +1699,18 @@ func main() {
         testUnknownProblem10()
         testUnknownProblemSeed(1489941049442429888, 5)
         testUnknownProblem01()
-        //testUnknownProblem08()
+        testUnknownProblem08()
         testUnknownProblem11()
         testUnknownProblem06()
-        // wrong
-        //testUnknownProblem07()
-        // wrong
+        testUnknownProblem07()
+        // wrong next edge
         //testUnknownProblem12()
         testUnknownProblem04()
-        // wrong
+        // wrong face
         //testUnknownProblemSeed(1483369884537650258, 20)
-        testUnknownProblemSeed(1483370089898481236, 15)
-        //testUnknownProblem05()
-        testUnknownProblemSeed(1483370089898481236, 15)
+        // infinite loop
+        //testUnknownProblemSeed(1483370089898481236, 15)
+        testUnknownProblem05()
         testUnknownProblem02()
     }
 
@@ -1751,7 +1735,7 @@ func main() {
             testRandom(5)
         }
 
-        // Edge 1: {6 0 26 2 {{241.90357878309425 103.13635491102873 0} {-427.54352793789894 -125.38564346969068 0}}} has an invalid twin edge
+        // Infinite loop
         testUnknownProblemSeed(1483370150842201370, 15)
 
         // crashes...
@@ -1782,7 +1766,7 @@ func main() {
 
     if test {
         // infinite loop? COME ON.
-        testUnknownProblemSeed(1483370150842201370, 15)
+        //testUnknownProblemSeed(1483370150842201370, 15)
     }
 
 }
