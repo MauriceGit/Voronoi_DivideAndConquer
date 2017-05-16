@@ -44,7 +44,6 @@ type ChainElem struct {
 
 
 var g_recursions int = 0
-var g_edgeIndexList []EdgeIndex
 
 ////////////////////////////////////////////////////////////////////////
 //  Pretty Print the  Voronoi Attributes
@@ -340,7 +339,7 @@ func drawDividingChain(chain []ChainElem) {
 
     }
 
-    f, err := os.OpenFile("dividing_chain_rec_8.png", os.O_WRONLY|os.O_CREATE, 0600)
+    f, err := os.OpenFile("dividing_chain.png", os.O_WRONLY|os.O_CREATE, 0600)
     if err != nil {
         fmt.Println(err)
         return
@@ -588,10 +587,6 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
         intersects, location := LineIntersection4(bisector, createLine(v, edge, true))
         //fmt.Printf("Found an intersection: %v, %v\n", intersects, location)
 
-        if (g_recursions == 8) {
-            g_edgeIndexList = append(g_edgeIndexList, edge)
-        }
-
         if intersects &&
            edge != lastEdge &&
            location.Y < maxY &&
@@ -721,23 +716,37 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     bisector := PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
     bisector = Amplify(bisector, 100.0)
 
+    if g_recursions == 14 {
+        v.pprint()
+
+    }
+
+
     // As long as we didn't reach the lowest possible tangente, we continue.
     for {
+        if g_recursions == 14 {
+            //drawDividingChain(dividingChain)
+        }
+        fmt.Printf("for with p == %v, q == %v\n", p, q)
         // Here we break out of the loop, when we reach the very bottom!
         lastMerge := p == h1Down && q == h2Down
 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
+        fmt.Printf("found P intersection\n")
         edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
+        fmt.Printf("found Q intersection\n")
 
         switch {
 
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
             case edgeP == EmptyEdge && edgeQ == EmptyEdge:
+                fmt.Printf("e\n")
                 dividingChain = append(dividingChain, ChainElem{Vector{}, EmptyEdge, EmptyEdge, p, q, bisector})
 
             // Equal Intersection with both edges. So 4 edges meet.
             case edgeQ != EmptyEdge && edgeP != EmptyEdge && Equal(locationP, locationQ):
+                fmt.Printf("p && q\n")
                 // This could result in kind of an invalid Delaunay triangulations. At least regarding a triangle.
                 // This should now work for situations, where 4 edges meet. I have to re-examine for even more edges meeting...
 
@@ -752,7 +761,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face p
             case edgeP != EmptyEdge && (edgeQ == EmptyEdge || locationP.Y >= locationQ.Y):
-
+                fmt.Printf("p\n")
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, EmptyEdge, p, q, bisector})
 
                 lastVertex   = locationP
@@ -763,7 +772,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face q
             case edgeQ != EmptyEdge && (edgeP == EmptyEdge || locationQ.Y >= locationP.Y):
-
+                fmt.Printf("q\n")
                 dividingChain = append(dividingChain, ChainElem{locationQ, EmptyEdge, edgeQ, p, q, bisector})
 
                 lastVertex   = locationQ
@@ -789,8 +798,8 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
     }
 
-    if g_recursions == 7 {
-        //drawDividingChain(dividingChain)
+    if g_recursions == 14 {
+        drawDividingChain(dividingChain)
     }
 
     return dividingChain
@@ -864,7 +873,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         // edgeQ, the new first edge for the face q must be edgeQ!
         // Simple case!
         if chain.edgeQ != EmptyEdge && v.faces[chain.q].EEdge == chain.edgeQ && chain.intersection != InfinitePoint {
-            fmt.Printf("are we here? %v, %v, %v\n", chain.q, heEdgeDown, chain.edgeQ)
+            //fmt.Printf("are we here? %v, %v, %v\n", chain.q, heEdgeDown, chain.edgeQ)
             v.faces[chain.q].EEdge = heEdgeDown
         }
 
@@ -1637,7 +1646,7 @@ func testUnknownProblemSeed(seed int64, count int) {
 
     sort.Sort(pointList)
 
-    //pointList = pointList[:len(pointList)/2]
+    //pointList = pointList[len(pointList)/2:]
     //pointList = pointList[len(pointList)/2:]
 
     v := CreateVoronoi(pointList)
@@ -1685,7 +1694,7 @@ func testRandom(count int) {
 
 func main() {
 
-    working := true
+    working := false
 
     if working {
         testNormal01()
@@ -1766,7 +1775,7 @@ func main() {
 
     if test {
         // infinite loop? COME ON.
-        //testUnknownProblemSeed(1483370150842201370, 15)
+        testUnknownProblemSeed(1483370150842201370, 15)
     }
 
 }
