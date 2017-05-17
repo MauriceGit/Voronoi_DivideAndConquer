@@ -54,6 +54,7 @@ type HEEdge struct {
     // Starts from: this->ETwin->VOrigin. With this->FFace == this->ENext->FFace
     // Following ENext will traverse the polygon around FFace!
     ENext           EdgeIndex
+    EPrev           EdgeIndex
     FFace           FaceIndex
 
     // Iff VOrigin is NOT defined, an edge representation is required

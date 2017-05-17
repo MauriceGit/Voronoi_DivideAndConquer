@@ -484,11 +484,12 @@ func (v *Voronoi)createFace(refPoint Vector, eEdge EdgeIndex) FaceIndex {
 }
 
 // So we can get a pointer of some data structure? What about scope issues?
-func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, eNext EdgeIndex, fFace FaceIndex, tmpEdge Edge) EdgeIndex {
+func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, ePrev, eNext EdgeIndex, fFace FaceIndex, tmpEdge Edge) EdgeIndex {
     v.edges[v.firstFreeEdgePos] = HEEdge {
         VOrigin:    vOrigin,
         ETwin:      eTwin,
         ENext:      eNext,
+        EPrev:      ePrev,
         FFace:      fFace,
         TmpEdge:    tmpEdge,
     }
@@ -816,6 +817,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
     nextPEdge    := EmptyEdge
     lastDownEdge := EmptyEdge
+    lastUpEdge   := EmptyEdge
     lastVertex   := EmptyVertex
 
     lastQRemove  := EmptyEdge
@@ -851,12 +853,24 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         otherWayBisector := chain.bisector
         otherWayBisector.Dir = Mult(otherWayBisector.Dir, -1)
 
-        heEdgeUp   := v.createEdge(heVertex,   EmptyEdge, nextPEdge,   chain.p, otherWayBisector)
-        heEdgeDown := v.createEdge(lastVertex, heEdgeUp,  chain.edgeQ, chain.q, chain.bisector)
+
+
+        heEdgeUp   := v.createEdge(heVertex,   EmptyEdge, chain.edgeP,  nextPEdge,   chain.p, otherWayBisector)
+        heEdgeDown := v.createEdge(lastVertex, heEdgeUp,  lastDownEdge, chain.edgeQ, chain.q, chain.bisector)
         v.edges[heEdgeUp].ETwin = heEdgeDown
 
         if lastDownEdge != EmptyEdge {
             v.edges[lastDownEdge].ENext = heEdgeDown
+        }
+
+        // Set the EPrev of the last UpEdge, so it is always well defined (if possible).
+        if lastUpEdge != EmptyEdge {
+            v.edges[lastUpEdge].EPrev = heEdgeUp
+        }
+
+        // Set Previous edge. Only in case of an intersection with Q. The P one is handled implicitely.
+        if lastUpEdge != EmptyEdge {
+            v.edges[lastUpEdge].EPrev = heEdgeUp
         }
 
         // For the very first dividing chain element holds, that the face q has to update
@@ -1013,6 +1027,8 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         } else {
             lastDownEdge = heEdgeDown
         }
+
+        lastUpEdge = heEdgeUp
 
         lastVertex = heVertex
         qFirstContact = false
