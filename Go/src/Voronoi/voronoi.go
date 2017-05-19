@@ -64,7 +64,7 @@ func (v *Voronoi) pprint () {
     var dummyE HEEdge
     for i,e := range v.edges {
         if e != dummyE {
-            fmt.Printf("\t%v:\tOrigin: %v,\tTwin: %v,\tNext: %v,\tFace: %v\n", i, e.VOrigin, e.ETwin, e.ENext, e.FFace)
+            fmt.Printf("\t%v:\tOrigin: %v,\tTwin: %v,\tPrev: %v,\tNext: %v,\tFace: %v\n", i, e.VOrigin, e.ETwin, e.EPrev, e.ENext, e.FFace)
         }
     }
     fmt.Printf("\n")
@@ -387,6 +387,16 @@ func (v *Voronoi) Verify() error {
             // Check, if the next edge is valid
             if e.ENext != EmptyEdge && v.edges[e.ENext] == emptyE {
                 return errors.New(fmt.Sprintf("Next edge for edge %v: %v is invalid", i, e))
+            }
+
+            // Check, if the prev edge is valid
+            if e.EPrev != EmptyEdge && v.edges[e.EPrev] == emptyE {
+                return errors.New(fmt.Sprintf("Prev edge for edge %v: %v is invalid", i, e))
+            }
+
+            // If the prev edge is valid
+            if e.VOrigin != EmptyVertex && e.EPrev == EmptyEdge {
+                return errors.New(fmt.Sprintf("Prev edge for edge %v: %v is not defined but should be", i, e))
             }
 
         }
@@ -799,7 +809,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
     }
 
-    if g_recursions == 14 {
+    if g_recursions == 3 {
         drawDividingChain(dividingChain)
     }
 
@@ -858,11 +868,6 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             v.edges[lastDownEdge].ENext = heEdgeDown
         }
 
-        // Set the EPrev of the last UpEdge, so it is always well defined (if possible).
-        if lastUpEdge != EmptyEdge {
-            v.edges[lastUpEdge].EPrev = heEdgeUp
-        }
-
         // Set Previous edge. Only in case of an intersection with Q. The P one is handled implicitely.
         if lastUpEdge != EmptyEdge {
             v.edges[lastUpEdge].EPrev = heEdgeUp
@@ -911,6 +916,8 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                 if removeNextEdge != EmptyEdge && v.edges[removeNextEdge] != emptyE && v.edges[removeNextEdge].ETwin != lastPEdge {
 
+                    fmt.Printf("DELETE E: %v | %v\n", removeNextEdge, v.edges[removeNextEdge].ETwin)
+
                     v.edges[v.edges[removeNextEdge].ETwin] = emptyE
                     v.edges[removeNextEdge] = emptyE
 
@@ -932,13 +939,19 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 removeLastEdge := v.edges[chain.edgeQ].EPrev
 
 
-
+                if removeLastEdge != EmptyEdge {
+                    fmt.Printf("removeLastEdge: %v --> %v, lastQEdge: %v\n", removeLastEdge, v.edges[removeLastEdge], lastQEdge)
+                } else {
+                    fmt.Printf("removeLastEdge: EmptyEdge\n")
+                }
 
                 if removeLastEdge != EmptyEdge && v.edges[removeLastEdge] != emptyE && v.edges[removeLastEdge].ETwin != lastQEdge {
 
                     if v.faces[chain.q].EEdge == removeLastEdge {
                         v.faces[chain.q].EEdge = heEdgeDown
                     }
+
+                    fmt.Printf("DELETE E: %v | %v\n", removeLastEdge, v.edges[removeLastEdge].ETwin)
 
                     v.edges[v.edges[removeLastEdge].ETwin] = emptyE
                     v.edges[removeLastEdge] = emptyE
@@ -948,6 +961,8 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 v.vertices[v.edges[chain.edgeQ].VOrigin] = emptyV
             }
         }
+
+        lastUpEdge = EmptyEdge
 
         // Setting States
         if chain.edgeP != EmptyEdge {
@@ -961,10 +976,12 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
         } else {
             nextPEdge = heEdgeUp
+            lastUpEdge = heEdgeUp
         }
 
         // Setting States
         if chain.edgeQ != EmptyEdge {
+            v.edges[chain.edgeQ].EPrev = heEdgeDown
             lastQEdge = chain.edgeQ
             v.edges[chain.edgeQ].VOrigin = heVertex
             lastDownEdge = v.edges[chain.edgeQ].ETwin
@@ -975,7 +992,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             lastDownEdge = heEdgeDown
         }
 
-        lastUpEdge = heEdgeUp
+
 
         lastVertex = heVertex
 
@@ -991,13 +1008,15 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     //   /    \
     // THIS    \x q intersection
     if lastSpecialQEdge != EmptyEdge && v.edges[lastSpecialQEdge] != emptyE {
+        fmt.Printf("DELETE SPECIAL E: %v | %v\n", lastSpecialQEdge, v.edges[lastSpecialQEdge].ETwin)
         v.edges[v.edges[lastSpecialQEdge].ETwin] = emptyE
         v.edges[lastSpecialQEdge] = emptyE
     }
 
     if lastSpecialPEdge != EmptyEdge && v.edges[lastSpecialPEdge] != emptyE {
-        v.edges[v.edges[v.edges[v.edges[lastPEdge].ETwin].EPrev].ETwin] = emptyE
-        v.edges[v.edges[v.edges[lastPEdge].ETwin].EPrev] = emptyE
+        fmt.Printf("DELETE SPECIAL E: %v | %v\n", lastSpecialPEdge, v.edges[lastSpecialPEdge].ETwin)
+        v.edges[v.edges[lastSpecialPEdge].ETwin] = emptyE
+        v.edges[lastSpecialPEdge] = emptyE
     }
 
     fmt.Printf("FINISHED MERGE OF %v AND %v\n\n", left, right)
@@ -1586,7 +1605,7 @@ func testUnknownProblemSeed(seed int64, count int) {
     sort.Sort(pointList)
 
     pointList = pointList[len(pointList)/2:]
-    //pointList = pointList[len(pointList)/2:]
+    pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
     v.pprint()
