@@ -871,6 +871,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         heEdgeDown := v.createEdge(lastVertex, heEdgeUp,  lastDownEdge, chain.edgeQ, chain.q, chain.bisector)
         v.edges[heEdgeUp].ETwin = heEdgeDown
 
+        fmt.Printf("potential special edge: %v. edgeQ: %v\n", potentialSpecialQEdge, chain.edgeQ)
 
         if chain.edgeQ != EmptyEdge && potentialSpecialQEdge != EmptyEdge {
 
@@ -967,6 +968,11 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     //fmt.Printf("removeNextEdge     : %v --> %v, lastQEdge: %v\n", removeNextEdge, v.edges[removeNextEdge], lastQEdge)
                     //fmt.Printf("removeNextEdge Twin: %v --> %v, lastQEdge: %v\n", v.edges[removeNextEdge].ETwin, v.edges[v.edges[removeNextEdge].ETwin], lastQEdge)
 
+                    tmpF := v.edges[v.edges[removeNextEdge].ETwin].FFace
+                    if v.faces[tmpF].EEdge == v.edges[removeNextEdge].ETwin {
+                        v.faces[tmpF].EEdge = v.edges[v.edges[removeNextEdge].ETwin].ENext
+                    }
+
                     fmt.Printf("DELETE E: %v | %v\n", removeNextEdge, v.edges[removeNextEdge].ETwin)
 
                     v.edges[v.edges[removeNextEdge].ETwin] = emptyE
@@ -996,6 +1002,11 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                     if v.faces[chain.q].EEdge == removeLastEdge {
                         v.faces[chain.q].EEdge = heEdgeDown
+                    }
+
+                    tmpF := v.edges[v.edges[removeLastEdge].ETwin].FFace
+                    if v.faces[tmpF].EEdge == v.edges[removeLastEdge].ETwin {
+                        v.faces[tmpF].EEdge = v.edges[v.edges[removeLastEdge].ETwin].EPrev
                     }
 
                     fmt.Printf("DELETE E: %v | %v\n", removeLastEdge, v.edges[removeLastEdge].ETwin)
@@ -1053,6 +1064,14 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
         lastVertex = heVertex
 
+    }
+
+    fmt.Printf("potential special edge: %v\n", potentialSpecialQEdge)
+    if potentialSpecialQEdge != EmptyEdge {
+        specialQEdges = append(specialQEdges, potentialSpecialQEdge)
+    }
+    if potentialSpecialPEdge != EmptyEdge {
+        specialPEdges = append(specialPEdges, potentialSpecialPEdge)
     }
 
     // Remove the last edge, that might still be hanging around...
