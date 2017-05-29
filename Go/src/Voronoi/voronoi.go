@@ -858,8 +858,11 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     //       /  \
     //      /    \
     // FACE/      \x q intersection
-    faceRefCurrEdge  := EmptyEdge
-    faceRefFirstEdge := EmptyEdge
+    // This should not be necessary for the same situation on the P side, as
+    // only the last edge is a special one (not first!) and a face reference
+    // should not be removed.
+    faceRefCurrEdgeQ  := EmptyEdge
+    faceRefFirstEdgeQ := EmptyEdge
 
     chainList := v.extractDividingChain(left, right)
 
@@ -1016,26 +1019,26 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     //fmt.Printf("removeLastEdge     : %v --> %v, lastQEdge: %v\n", removeLastEdge, v.edges[removeLastEdge], lastQEdge)
                     //fmt.Printf("removeLastEdge Twin: %v --> %v, lastQEdge: %v\n", v.edges[removeLastEdge].ETwin, v.edges[v.edges[removeLastEdge].ETwin], lastQEdge)
 
-                    if faceRefFirstEdge == EmptyEdge {
-                        faceRefFirstEdge = heEdgeDown
-                        faceRefCurrEdge  = removeLastEdge
+                    if faceRefFirstEdgeQ == EmptyEdge {
+                        faceRefFirstEdgeQ = heEdgeDown
+                        faceRefCurrEdgeQ  = removeLastEdge
                     }
-                    if v.edges[v.edges[removeLastEdge].ETwin].ENext == faceRefCurrEdge {
-                        faceRefCurrEdge = v.edges[removeLastEdge].ETwin
+                    if v.edges[v.edges[removeLastEdge].ETwin].ENext == faceRefCurrEdgeQ {
+                        faceRefCurrEdgeQ = v.edges[removeLastEdge].ETwin
                     }
                     // I don't think, this will trigger. But just in case...
-                    if v.faces[v.edges[v.edges[removeLastEdge].ETwin].FFace].EEdge == faceRefCurrEdge {
-                       v.faces[v.edges[v.edges[removeLastEdge].ETwin].FFace].EEdge = faceRefFirstEdge
-                       faceRefCurrEdge = EmptyEdge
-                       faceRefFirstEdge = EmptyEdge
+                    if v.faces[v.edges[v.edges[removeLastEdge].ETwin].FFace].EEdge == faceRefCurrEdgeQ {
+                       v.faces[v.edges[v.edges[removeLastEdge].ETwin].FFace].EEdge = faceRefFirstEdgeQ
+                       faceRefCurrEdgeQ = EmptyEdge
+                       faceRefFirstEdgeQ = EmptyEdge
                     }
 
                     if v.faces[chain.q].EEdge == removeLastEdge {
                         v.faces[chain.q].EEdge = heEdgeDown
 
                         // We hit the first edge (of the face), so we can remove the references.
-                        faceRefCurrEdge = EmptyEdge
-                        faceRefFirstEdge = EmptyEdge
+                        faceRefCurrEdgeQ = EmptyEdge
+                        faceRefFirstEdgeQ = EmptyEdge
                     }
 
                     tmpF := v.edges[v.edges[removeLastEdge].ETwin].FFace
@@ -1136,11 +1139,11 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     //}
     for _,specialEdge := range specialQEdges {
         fmt.Printf("Q DELETE SPECIAL E: %v | %v\n", specialEdge, v.edges[specialEdge].ETwin)
-        fmt.Printf("face: %v, faceRefFirstEdge: %v, faceRefCurrEdge: %v\n", v.edges[v.edges[specialEdge].ETwin].FFace, faceRefFirstEdge, faceRefCurrEdge)
+        fmt.Printf("face: %v, faceRefFirstEdgeQ: %v, faceRefCurrEdgeQ: %v\n", v.edges[v.edges[specialEdge].ETwin].FFace, faceRefFirstEdgeQ, faceRefCurrEdgeQ)
 
         if v.faces[v.edges[v.edges[specialEdge].ETwin].FFace].EEdge == v.edges[specialEdge].ETwin {
             fmt.Printf("Successfully reset the first edge of face: %v\n", v.edges[v.edges[specialEdge].ETwin].FFace)
-            v.faces[v.edges[v.edges[specialEdge].ETwin].FFace].EEdge = faceRefFirstEdge
+            v.faces[v.edges[v.edges[specialEdge].ETwin].FFace].EEdge = faceRefFirstEdgeQ
         }
 
         v.edges[v.edges[specialEdge].ETwin] = emptyE
@@ -1785,7 +1788,7 @@ func testRandom(count int) {
 
 func main() {
 
-    working := true
+    working := false
 
     if working {
         testNormal01()
@@ -1811,7 +1814,7 @@ func main() {
         // infinite loop
         //testUnknownProblemSeed(1483370089898481236, 15)
         testUnknownProblem05()
-        testUnknownProblem02()
+        //testUnknownProblem02()
     }
 
     toBeVerified := false
@@ -1867,6 +1870,7 @@ func main() {
     if test {
         // infinite loop? COME ON.
         testUnknownProblemSeed(1483370150842201370, 15)
+        testUnknownProblem02()
     }
 
 }
