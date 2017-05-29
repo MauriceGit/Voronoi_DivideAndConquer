@@ -1785,7 +1785,7 @@ func testRandom(count int) {
 
 func main() {
 
-    working := false
+    working := true
 
     if working {
         testNormal01()
