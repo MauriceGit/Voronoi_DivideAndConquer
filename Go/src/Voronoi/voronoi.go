@@ -845,6 +845,22 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     lastQEdge    := EmptyEdge
     lastPEdge    := EmptyEdge
 
+
+
+    // Save DownEdge for when FACEs edge is deleted and needs a new first Edge.
+    //            | DownEdge
+    //            |_____
+    //            /x q intersection
+    //           /
+    //          /\
+    //         /  \x q intersection
+    //        /\
+    //       /  \
+    //      /    \
+    // FACE/      \x q intersection
+    faceRefCurrEdge  := EmptyEdge
+    faceRefFirstEdge := EmptyEdge
+
     chainList := v.extractDividingChain(left, right)
 
     // Iterating through the dividing chain and actually merge the voronois.
@@ -871,7 +887,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         heEdgeDown := v.createEdge(lastVertex, heEdgeUp,  lastDownEdge, chain.edgeQ, chain.q, chain.bisector)
         v.edges[heEdgeUp].ETwin = heEdgeDown
 
-        fmt.Printf("potential special edge: %v. edgeQ: %v\n", potentialSpecialQEdge, chain.edgeQ)
+        //fmt.Printf("potential special edge: %v. edgeQ: %v\n", potentialSpecialQEdge, chain.edgeQ)
 
         if chain.edgeQ != EmptyEdge && potentialSpecialQEdge != EmptyEdge {
 
@@ -1000,8 +1016,26 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     //fmt.Printf("removeLastEdge     : %v --> %v, lastQEdge: %v\n", removeLastEdge, v.edges[removeLastEdge], lastQEdge)
                     //fmt.Printf("removeLastEdge Twin: %v --> %v, lastQEdge: %v\n", v.edges[removeLastEdge].ETwin, v.edges[v.edges[removeLastEdge].ETwin], lastQEdge)
 
+                    if faceRefFirstEdge == EmptyEdge {
+                        faceRefFirstEdge = heEdgeDown
+                        faceRefCurrEdge  = removeLastEdge
+                    }
+                    if v.edges[v.edges[removeLastEdge].ETwin].ENext == faceRefCurrEdge {
+                        faceRefCurrEdge = v.edges[removeLastEdge].ETwin
+                    }
+                    // I don't think, this will trigger. But just in case...
+                    if v.faces[v.edges[v.edges[removeLastEdge].ETwin].FFace].EEdge == faceRefCurrEdge {
+                       v.faces[v.edges[v.edges[removeLastEdge].ETwin].FFace].EEdge = faceRefFirstEdge
+                       faceRefCurrEdge = EmptyEdge
+                       faceRefFirstEdge = EmptyEdge
+                    }
+
                     if v.faces[chain.q].EEdge == removeLastEdge {
                         v.faces[chain.q].EEdge = heEdgeDown
+
+                        // We hit the first edge (of the face), so we can remove the references.
+                        faceRefCurrEdge = EmptyEdge
+                        faceRefFirstEdge = EmptyEdge
                     }
 
                     tmpF := v.edges[v.edges[removeLastEdge].ETwin].FFace
@@ -1101,7 +1135,14 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
     //    v.edges[lastSpecialPEdge] = emptyE
     //}
     for _,specialEdge := range specialQEdges {
-        fmt.Printf("DELETE SPECIAL E: %v | %v\n", specialEdge, v.edges[specialEdge].ETwin)
+        fmt.Printf("Q DELETE SPECIAL E: %v | %v\n", specialEdge, v.edges[specialEdge].ETwin)
+        fmt.Printf("face: %v, faceRefFirstEdge: %v, faceRefCurrEdge: %v\n", v.edges[v.edges[specialEdge].ETwin].FFace, faceRefFirstEdge, faceRefCurrEdge)
+
+        if v.faces[v.edges[v.edges[specialEdge].ETwin].FFace].EEdge == v.edges[specialEdge].ETwin {
+            fmt.Printf("Successfully reset the first edge of face: %v\n", v.edges[v.edges[specialEdge].ETwin].FFace)
+            v.faces[v.edges[v.edges[specialEdge].ETwin].FFace].EEdge = faceRefFirstEdge
+        }
+
         v.edges[v.edges[specialEdge].ETwin] = emptyE
         v.edges[specialEdge] = emptyE
     }
