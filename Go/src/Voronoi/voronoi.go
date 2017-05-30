@@ -161,7 +161,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
                 //continue
             }
 
-            if i == 14 || i == 15 {
+            if i == 22 || i == 23 {
                 fmt.Printf("coloring now for something\n")
                 tmpC := color.RGBA{0,0,0,255}
                 gc.SetStrokeColor(tmpC)
@@ -179,8 +179,15 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     }
 
     // Faces/Reference Points!
-    c = color.RGBA{255,0,0,255}
-    for _,f := range v.faces {
+    normalC := color.RGBA{255,0,0,255}
+    tmpC := color.RGBA{0,0,0,255}
+    for i,f := range v.faces {
+        if i == 12 {
+            fmt.Printf("coloring face now for something\n")
+            c = tmpC
+        } else {
+            c = normalC
+        }
         drawCircle(m, int(f.ReferencePoint.X*10), h-int(f.ReferencePoint.Y*10), 5, c)
     }
 
@@ -395,7 +402,7 @@ func (v *Voronoi) Verify() error {
             }
 
             // If the prev edge is valid
-            if e.VOrigin != EmptyVertex && e.EPrev == EmptyEdge {
+            if e.VOrigin != EmptyVertex && e.VOrigin != InfiniteVertex && e.EPrev == EmptyEdge {
                 return errors.New(fmt.Sprintf("Prev edge for edge %v: %v is not defined but should be", i, e))
             }
 
@@ -815,7 +822,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
     }
 
-    if g_recursions == 14 {
+    if g_recursions == 6 {
         drawDividingChain(dividingChain)
     }
 
@@ -890,8 +897,6 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         heEdgeDown := v.createEdge(lastVertex, heEdgeUp,  lastDownEdge, chain.edgeQ, chain.q, chain.bisector)
         v.edges[heEdgeUp].ETwin = heEdgeDown
 
-        //fmt.Printf("potential special edge: %v. edgeQ: %v\n", potentialSpecialQEdge, chain.edgeQ)
-
         if chain.edgeQ != EmptyEdge && potentialSpecialQEdge != EmptyEdge {
 
             if potentialSpecialQEdge == chain.edgeQ {
@@ -959,17 +964,25 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             v.faces[chain.q].EEdge = heEdgeDown
         }
 
+
+
         if v.faces[chain.q].EEdge == EmptyEdge || (lastDownEdge == EmptyEdge && heVertex != InfiniteVertex) {
             v.faces[chain.q].EEdge = heEdgeDown
         }
 
-        if v.faces[chain.q].EEdge == chain.edgeQ {
+        fmt.Printf("q: %v, q.EEdge: %v\n", chain.q, v.faces[chain.q].EEdge)
+
+        if v.faces[chain.q].EEdge == chain.edgeQ && chain.intersection != InfinitePoint {
             v.faces[chain.q].EEdge = heEdgeDown
         }
+
+        fmt.Printf("q: %v, q.EEdge: %v\n", chain.q, v.faces[chain.q].EEdge)
 
         if v.faces[chain.p].EEdge == EmptyEdge || !heVertex.Valid() {
             v.faces[chain.p].EEdge = heEdgeUp
         }
+
+
 
         // Removing stuff!
         if chain.edgeP != EmptyEdge {
@@ -1019,23 +1032,36 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                     //fmt.Printf("removeLastEdge     : %v --> %v, lastQEdge: %v\n", removeLastEdge, v.edges[removeLastEdge], lastQEdge)
                     //fmt.Printf("removeLastEdge Twin: %v --> %v, lastQEdge: %v\n", v.edges[removeLastEdge].ETwin, v.edges[v.edges[removeLastEdge].ETwin], lastQEdge)
 
-                    if faceRefFirstEdgeQ == EmptyEdge {
+
+                    //edgeJustSet := false
+                    if true || faceRefFirstEdgeQ == EmptyEdge {
+                        fmt.Printf("Set faceRefFirstEdgeQ to %v, faceRefCurrEdgeQ to %v\n", heEdgeDown, removeLastEdge)
                         faceRefFirstEdgeQ = heEdgeDown
                         faceRefCurrEdgeQ  = removeLastEdge
+                        //edgeJustSet = true
                     }
                     if v.edges[v.edges[removeLastEdge].ETwin].ENext == faceRefCurrEdgeQ {
                         faceRefCurrEdgeQ = v.edges[removeLastEdge].ETwin
                     }
                     // I don't think, this will trigger. But just in case...
                     if v.faces[v.edges[v.edges[removeLastEdge].ETwin].FFace].EEdge == faceRefCurrEdgeQ {
-                       v.faces[v.edges[v.edges[removeLastEdge].ETwin].FFace].EEdge = faceRefFirstEdgeQ
-                       faceRefCurrEdgeQ = EmptyEdge
-                       faceRefFirstEdgeQ = EmptyEdge
+                        fmt.Printf("THIS should NOT happen!\n")
+                        v.faces[v.edges[v.edges[removeLastEdge].ETwin].FFace].EEdge = faceRefFirstEdgeQ
+                        faceRefCurrEdgeQ = EmptyEdge
+                        faceRefFirstEdgeQ = EmptyEdge
+                    }
+                    // I think, it is wrong, to delete the currEdge here, because we have to check against it later...
+                    if removeLastEdge == faceRefCurrEdgeQ || v.edges[removeLastEdge].ETwin == faceRefCurrEdgeQ {
+                        //fmt.Printf("EMPTY removeLastEdge: %v, faceRefCurrEdgeQ: %v\n", removeLastEdge, faceRefCurrEdgeQ)
+                        //faceRefCurrEdgeQ = EmptyEdge
+                        //faceRefFirstEdgeQ = EmptyEdge
                     }
 
                     if v.faces[chain.q].EEdge == removeLastEdge {
-                        v.faces[chain.q].EEdge = heEdgeDown
 
+                        //fmt.Printf("0 set face %v edge to %v\n", chain.q, heEdgeDown)
+
+                        v.faces[chain.q].EEdge = heEdgeDown
                         // We hit the first edge (of the face), so we can remove the references.
                         faceRefCurrEdgeQ = EmptyEdge
                         faceRefFirstEdgeQ = EmptyEdge
@@ -1043,6 +1069,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                     tmpF := v.edges[v.edges[removeLastEdge].ETwin].FFace
                     if v.faces[tmpF].EEdge == v.edges[removeLastEdge].ETwin {
+                        //fmt.Printf("1 set face %v edge to %v\n", tmpF, v.edges[v.edges[removeLastEdge].ETwin].EPrev)
                         v.faces[tmpF].EEdge = v.edges[v.edges[removeLastEdge].ETwin].EPrev
                     }
 
@@ -1449,6 +1476,9 @@ func testUnknownProblem02() {
     pointList = append(pointList, Vector{50., 20., 0})
     pointList = append(pointList, Vector{60., 10., 0})
 
+
+    //pointList = pointList[:len(pointList)/2]
+
     v := CreateVoronoi(pointList)
     v.pprint()
 
@@ -1788,7 +1818,7 @@ func testRandom(count int) {
 
 func main() {
 
-    working := false
+    working := true
 
     if working {
         testNormal01()
@@ -1806,15 +1836,14 @@ func main() {
         testUnknownProblem11()
         testUnknownProblem06()
         testUnknownProblem07()
-        // wrong next edge
-        //testUnknownProblem12()
+        testUnknownProblem12()
         testUnknownProblem04()
-        // wrong face
-        //testUnknownProblemSeed(1483369884537650258, 20)
-        // infinite loop
-        //testUnknownProblemSeed(1483370089898481236, 15)
+        testUnknownProblemSeed(1483369884537650258, 20)
+        testUnknownProblemSeed(1483370089898481236, 15)
         testUnknownProblem05()
-        //testUnknownProblem02()
+        testUnknownProblem02()
+        testUnknownProblemSeed(1483370150842201370, 15)
+        testUnknownProblemSeed(1483370130545841965, 15)
     }
 
     toBeVerified := false
@@ -1838,12 +1867,6 @@ func main() {
             testRandom(5)
         }
 
-        // Infinite loop
-        testUnknownProblemSeed(1483370150842201370, 15)
-
-        // crashes...
-        testUnknownProblemSeed(1483370130545841965, 15)
-
     }
 
     crashes := false
@@ -1859,18 +1882,10 @@ func main() {
 
     }
 
-    infLoop := false
-
-    if infLoop {
-
-    }
-
     test := true
 
     if test {
-        // infinite loop? COME ON.
-        testUnknownProblemSeed(1483370150842201370, 15)
-        testUnknownProblem02()
+
     }
 
 }
