@@ -161,7 +161,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
                 //continue
             }
 
-            if i == 22 || i == 23 {
+            if i == 50 || i == 51 {
                 fmt.Printf("coloring now for something\n")
                 tmpC := color.RGBA{0,0,0,255}
                 gc.SetStrokeColor(tmpC)
@@ -822,7 +822,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
     }
 
-    if g_recursions == 6 {
+    if g_recursions == 9 {
         drawDividingChain(dividingChain)
     }
 
@@ -1770,8 +1770,8 @@ func testUnknownProblemSeed(seed int64, count int) {
 
     sort.Sort(pointList)
 
+    pointList = pointList[:len(pointList)/2]
     //pointList = pointList[len(pointList)/2:]
-    //pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
     v.pprint()
@@ -1818,7 +1818,7 @@ func testRandom(count int) {
 
 func main() {
 
-    working := true
+    working := false
 
     if working {
         testNormal01()
@@ -1885,7 +1885,8 @@ func main() {
     test := true
 
     if test {
-
+        //testRandom(20)
+        testUnknownProblemSeed(1496121738043120503, 20)
     }
 
 }
