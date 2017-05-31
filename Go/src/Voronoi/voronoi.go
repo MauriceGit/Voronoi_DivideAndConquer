@@ -107,6 +107,7 @@ func drawCircle(m *image.RGBA, posX, posY, radius int, c color.RGBA) {
 
 func (v *Voronoi)createImage(filename string, whole bool) {
     var w, h int = 1000, 1000
+    scale := 10.0
 
     m := image.NewRGBA(image.Rect(0, 0, w, h))
 
@@ -169,10 +170,10 @@ func (v *Voronoi)createImage(filename string, whole bool) {
                 gc.SetStrokeColor(c)
             }
 
-            //fmt.Printf("From %v|%v ----> %v|%v\n", edge.Pos.X*10., float64(h) - edge.Pos.Y*10., Add(edge.Pos, edge.Dir).X*10., float64(h) - Add(edge.Pos, edge.Dir).Y*10.)
+            //fmt.Printf("From %v|%v ----> %v|%v\n", edge.Pos.X*scale., float64(h) - edge.Pos.Y*scale., Add(edge.Pos, edge.Dir).X*scale., float64(h) - Add(edge.Pos, edge.Dir).Y*scale.)
 
-            gc.MoveTo(edge.Pos.X*10., float64(h) - edge.Pos.Y*10.)
-            gc.LineTo(Add(edge.Pos, edge.Dir).X*10., float64(h) - Add(edge.Pos, edge.Dir).Y*10.)
+            gc.MoveTo(edge.Pos.X*scale, float64(h) - edge.Pos.Y*scale)
+            gc.LineTo(Add(edge.Pos, edge.Dir).X*scale, float64(h) - Add(edge.Pos, edge.Dir).Y*scale)
             gc.FillStroke()
             gc.Close()
         }
@@ -188,7 +189,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
         } else {
             c = normalC
         }
-        drawCircle(m, int(f.ReferencePoint.X*10), h-int(f.ReferencePoint.Y*10), 5, c)
+        drawCircle(m, int(f.ReferencePoint.X*scale), h-int(f.ReferencePoint.Y*scale), 5, c)
     }
 
     // Vertices between edges
@@ -196,7 +197,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     for _,ve := range v.vertices {
         var tmp HEVertex
         if ve != tmp {
-            drawCircle(m, int(ve.Pos.X*10), h-int(ve.Pos.Y*10), 2, c)
+            drawCircle(m, int(ve.Pos.X*scale), h-int(ve.Pos.Y*scale), 2, c)
         }
     }
 
@@ -970,13 +971,9 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             v.faces[chain.q].EEdge = heEdgeDown
         }
 
-        fmt.Printf("q: %v, q.EEdge: %v\n", chain.q, v.faces[chain.q].EEdge)
-
         if v.faces[chain.q].EEdge == chain.edgeQ && chain.intersection != InfinitePoint {
             v.faces[chain.q].EEdge = heEdgeDown
         }
-
-        fmt.Printf("q: %v, q.EEdge: %v\n", chain.q, v.faces[chain.q].EEdge)
 
         if v.faces[chain.p].EEdge == EmptyEdge || !heVertex.Valid() {
             v.faces[chain.p].EEdge = heEdgeUp
@@ -994,27 +991,37 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                 removeNextEdge := v.edges[chain.edgeP].ENext
 
+                // Now, this is somewhat tricky. We say, we want to keep an O(n logn) runtime in general.
+                // The divide&conquer takes O(logn), while the merging of two voronois can take up O(n) time
+                // as we have to go through every face, if the dividing chain goes through all of them.
+                // Now this loop here can run a maximum of O(n) as well, which logically can add up to O(n^2).
+                // Fortunately, this is not the case, because this loop here can go through O(n) edges only over
+                // one complete merge. It also deletes all n objects, it touches; meaning, that if we remove edges,
+                // they are not relevant for the merging any more. So both loops can only add up to one O(n).
+                for removeNextEdge != EmptyEdge && v.edges[removeNextEdge] != emptyE && v.edges[removeNextEdge].ETwin != lastPEdge {
+                    tmpRemoveNextEdge := v.edges[removeNextEdge].ENext
+                    //if removeNextEdge != EmptyEdge && v.edges[removeNextEdge] != emptyE && v.edges[removeNextEdge].ETwin != lastPEdge {
 
-                if removeNextEdge != EmptyEdge && v.edges[removeNextEdge] != emptyE && v.edges[removeNextEdge].ETwin != lastPEdge {
+                        tmpF := v.edges[v.edges[removeNextEdge].ETwin].FFace
+                        if v.faces[tmpF].EEdge == v.edges[removeNextEdge].ETwin {
+                            fmt.Printf("set face %v edge to %v\n", tmpF, v.edges[v.edges[removeNextEdge].ETwin].ENext)
+                            v.faces[tmpF].EEdge = v.edges[v.edges[removeNextEdge].ETwin].ENext
+                        }
 
-                    //fmt.Printf("removeNextEdge     : %v --> %v, lastQEdge: %v\n", removeNextEdge, v.edges[removeNextEdge], lastQEdge)
-                    //fmt.Printf("removeNextEdge Twin: %v --> %v, lastQEdge: %v\n", v.edges[removeNextEdge].ETwin, v.edges[v.edges[removeNextEdge].ETwin], lastQEdge)
+                        fmt.Printf("DELETE E: %v | %v\n", removeNextEdge, v.edges[removeNextEdge].ETwin)
 
-                    tmpF := v.edges[v.edges[removeNextEdge].ETwin].FFace
-                    if v.faces[tmpF].EEdge == v.edges[removeNextEdge].ETwin {
-                        v.faces[tmpF].EEdge = v.edges[v.edges[removeNextEdge].ETwin].ENext
-                    }
 
-                    fmt.Printf("DELETE E: %v | %v\n", removeNextEdge, v.edges[removeNextEdge].ETwin)
 
-                    v.edges[v.edges[removeNextEdge].ETwin] = emptyE
-                    v.edges[removeNextEdge] = emptyE
+                        v.edges[v.edges[removeNextEdge].ETwin] = emptyE
+                        v.edges[removeNextEdge] = emptyE
+
+                    //}
+                    // Delete the vertex.
+                    v.vertices[v.edges[v.edges[chain.edgeP].ETwin].VOrigin] = emptyV
+
+                    removeNextEdge = tmpRemoveNextEdge
 
                 }
-
-
-                // Delete the vertex.
-                v.vertices[v.edges[v.edges[chain.edgeP].ETwin].VOrigin] = emptyV
             }
         }
 
@@ -1177,9 +1184,9 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         v.edges[specialEdge] = emptyE
     }
 
-    if g_recursions == 14 {
-        //v.edges[32] = emptyE
-        //v.edges[33] = emptyE
+    if g_recursions == 9 {
+        //v.edges[14] = emptyE
+        //v.edges[15] = emptyE
     }
 
     fmt.Printf("FINISHED MERGE OF %v AND %v\n\n", left, right)
@@ -1771,7 +1778,7 @@ func testUnknownProblemSeed(seed int64, count int) {
     sort.Sort(pointList)
 
     pointList = pointList[:len(pointList)/2]
-    //pointList = pointList[len(pointList)/2:]
+    //pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
     v.pprint()
