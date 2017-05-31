@@ -1000,22 +1000,22 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                 // they are not relevant for the merging any more. So both loops can only add up to one O(n).
                 for removeNextEdge != EmptyEdge && v.edges[removeNextEdge] != emptyE && v.edges[removeNextEdge].ETwin != lastPEdge {
                     tmpRemoveNextEdge := v.edges[removeNextEdge].ENext
-                    //if removeNextEdge != EmptyEdge && v.edges[removeNextEdge] != emptyE && v.edges[removeNextEdge].ETwin != lastPEdge {
 
-                        tmpF := v.edges[v.edges[removeNextEdge].ETwin].FFace
-                        if v.faces[tmpF].EEdge == v.edges[removeNextEdge].ETwin {
-                            fmt.Printf("set face %v edge to %v\n", tmpF, v.edges[v.edges[removeNextEdge].ETwin].ENext)
-                            v.faces[tmpF].EEdge = v.edges[v.edges[removeNextEdge].ETwin].ENext
-                        }
+                    tmpF := v.edges[v.edges[removeNextEdge].ETwin].FFace
+                    if v.faces[tmpF].EEdge == v.edges[removeNextEdge].ETwin {
+                        fmt.Printf("set face %v edge to %v\n", tmpF, v.edges[v.edges[removeNextEdge].ETwin].ENext)
+                        v.faces[tmpF].EEdge = v.edges[v.edges[removeNextEdge].ETwin].ENext
+                    }
 
-                        fmt.Printf("DELETE E: %v | %v\n", removeNextEdge, v.edges[removeNextEdge].ETwin)
+                    if v.faces[v.edges[removeNextEdge].FFace].EEdge == removeNextEdge {
+                        v.faces[v.edges[removeNextEdge].FFace].EEdge = chain.edgeP
+                    }
 
+                    fmt.Printf("DELETE E: %v | %v\n", removeNextEdge, v.edges[removeNextEdge].ETwin)
 
+                    v.edges[v.edges[removeNextEdge].ETwin] = emptyE
+                    v.edges[removeNextEdge] = emptyE
 
-                        v.edges[v.edges[removeNextEdge].ETwin] = emptyE
-                        v.edges[removeNextEdge] = emptyE
-
-                    //}
                     // Delete the vertex.
                     v.vertices[v.edges[v.edges[chain.edgeP].ETwin].VOrigin] = emptyV
 
@@ -1777,7 +1777,7 @@ func testUnknownProblemSeed(seed int64, count int) {
 
     sort.Sort(pointList)
 
-    pointList = pointList[:len(pointList)/2]
+    //pointList = pointList[len(pointList)/2:]
     //pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
