@@ -1680,6 +1680,7 @@ func main() {
         testUnknownProblemSeed(1483370150842201370, 15)
         testUnknownProblemSeed(1483370130545841965, 15)
         testUnknownProblemSeed(1496121738043120503, 20)
+        testUnknownProblemSeed(1496247478836154924, 40)
     }
 
     toBeVerified := false
@@ -1721,8 +1722,9 @@ func main() {
     test := true
 
     if test {
-        //testRandom(20)
-        testUnknownProblemSeed(1496121738043120503, 20)
+        //testRandom(40)
+        //testUnknownProblemSeed(1496247359069208740, 50)
+
     }
 
 }
