@@ -127,10 +127,6 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     gc := draw2dimg.NewGraphicContext(m)
 
     gc.SetLineWidth(2)
-    if whole {
-        gc.SetLineWidth(2)
-        c = color.RGBA{255,255,0,255}
-    }
     gc.SetStrokeColor(c)
 
     for i,e := range v.edges {
@@ -169,11 +165,11 @@ func (v *Voronoi)createImage(filename string, whole bool) {
             }
 
             if i == 50 || i == 51 {
-                fmt.Printf("coloring now for something\n")
-                tmpC := color.RGBA{0,0,0,255}
-                gc.SetStrokeColor(tmpC)
+                //fmt.Printf("coloring now for something\n")
+                //tmpC := color.RGBA{0,0,0,255}
+                //gc.SetStrokeColor(tmpC)
             } else {
-                gc.SetStrokeColor(c)
+                //gc.SetStrokeColor(c)
             }
 
             //fmt.Printf("From %v|%v ----> %v|%v\n", edge.Pos.X*scale., float64(h) - edge.Pos.Y*scale., Add(edge.Pos, edge.Dir).X*scale., float64(h) - Add(edge.Pos, edge.Dir).Y*scale.)
@@ -187,15 +183,16 @@ func (v *Voronoi)createImage(filename string, whole bool) {
 
     // Faces/Reference Points!
     normalC := color.RGBA{255,0,0,255}
-    tmpC := color.RGBA{0,0,0,255}
+    //tmpC := color.RGBA{0,0,0,255}
+    c = normalC
     for i,f := range v.faces {
         if i == 15 {
-            fmt.Printf("coloring face now for something\n")
-            c = tmpC
+            //fmt.Printf("coloring face now for something\n")
+            //c = tmpC
         } else {
-            c = normalC
+            //c = normalC
         }
-        drawCircle(m, int(f.ReferencePoint.X*scale), h-int(f.ReferencePoint.Y*scale), 5, c)
+        drawCircle(m, int(f.ReferencePoint.X*scale), h-int(f.ReferencePoint.Y*scale), 2, c)
     }
 
     // Vertices between edges
@@ -841,7 +838,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     }
 
     if g_recursions == 24 {
-        drawDividingChain(dividingChain)
+        //dividingChain(dividingChain)
     }
 
     return dividingChain
@@ -1058,9 +1055,9 @@ func CreateVoronoi(pointList PointList) Voronoi {
     // See: http://www.cs.wustl.edu/~pless/546/lectures/L11.html
     // for the calculations of maximum voronoi object count.
     v := Voronoi {
-        vertices:           make([]HEVertex, 2*n-5 + 3 + 100),
+        vertices:           make([]HEVertex, 2*n-5 + 3 + 100000),
         firstFreeVertexPos: 0,
-        edges:              make([]HEEdge, 2*(3*n-6) + 6 + 100),
+        edges:              make([]HEEdge, 2*(3*n-6) + 6 + 100000),
         firstFreeEdgePos:   0,
         faces:              make([]HEFace, n),
         firstFreeFacePos:   0,
@@ -1614,7 +1611,7 @@ func testUnknownProblemSeed(seed int64, count int) {
     var pointList PointList
 
     for i:= 0; i < count; i++ {
-        v := Vector{r.Float64()*50.+25., r.Float64()*50.+25., 0}
+        v := Vector{r.Float64()*100., r.Float64()*100., 0}
         pointList = append(pointList, v)
     }
 
@@ -1650,7 +1647,7 @@ func testRandom(count int) {
     fmt.Printf("Seed: %v\n", strconv.FormatInt(seed, 10))
     fmt.Printf("Random poins:\n\t")
     for i:= 0; i < count; i++ {
-        v := Vector{r.Float64()*50.+25., r.Float64()*50.+25., 0}
+        v := Vector{r.Float64()*100., r.Float64()*100., 0}
         pointList = append(pointList, v)
         fmt.Printf("%v, ", v)
     }
@@ -1669,7 +1666,7 @@ func testRandom(count int) {
 func main() {
 
     g_drawImages = false
-    working := true
+    working := false
 
     if working {
         testNormal01()
@@ -1698,6 +1695,8 @@ func main() {
         testUnknownProblemSeed(1496121738043120503, 20)
         testUnknownProblemSeed(1496247478836154924, 40)
         testUnknownProblemSeed(1496247359069208740, 50)
+        testUnknownProblemSeed(1496294040279258517, 100)
+        testUnknownProblemSeed(1496294255661064215, 500)
     }
 
     toBeVerified := false
@@ -1734,7 +1733,8 @@ func main() {
     g_drawImages = true
 
     if test {
-        //testRandom(40)
+        //testRandom(10000)
+        testUnknownProblemSeed(1496295030863743777, 10000)
     }
 
 }
