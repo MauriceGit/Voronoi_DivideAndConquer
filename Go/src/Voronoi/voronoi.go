@@ -44,6 +44,7 @@ type ChainElem struct {
 
 
 var g_recursions int = 0
+var g_drawImages bool = true;
 
 ////////////////////////////////////////////////////////////////////////
 //  Pretty Print the  Voronoi Attributes
@@ -106,6 +107,11 @@ func drawCircle(m *image.RGBA, posX, posY, radius int, c color.RGBA) {
 }
 
 func (v *Voronoi)createImage(filename string, whole bool) {
+
+    if !g_drawImages {
+        return
+    }
+
     var w, h int = 1000, 1000
     scale := 10.0
 
@@ -183,7 +189,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     normalC := color.RGBA{255,0,0,255}
     tmpC := color.RGBA{0,0,0,255}
     for i,f := range v.faces {
-        if i == 12 {
+        if i == 15 {
             fmt.Printf("coloring face now for something\n")
             c = tmpC
         } else {
@@ -212,6 +218,10 @@ func (v *Voronoi)createImage(filename string, whole bool) {
 
 
 func drawEdgeList(v *Voronoi, edges []EdgeIndex, filename string) {
+    if !g_drawImages {
+        return
+    }
+
     var w, h int = 1000, 1000
 
     m := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -289,6 +299,9 @@ func drawEdgeList(v *Voronoi, edges []EdgeIndex, filename string) {
 }
 
 func (v *Voronoi)drawFaces() {
+    if !g_drawImages {
+        return
+    }
 
     for i,f := range v.faces {
         var edgeIndexList []EdgeIndex
@@ -318,6 +331,10 @@ func (v *Voronoi)drawFaces() {
 }
 
 func drawDividingChain(chain []ChainElem) {
+    if !g_drawImages {
+        return
+    }
+
     var w, h int = 1000, 1000
 
     m := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -823,7 +840,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
     }
 
-    if g_recursions == 9 {
+    if g_recursions == 24 {
         drawDividingChain(dividingChain)
     }
 
@@ -941,11 +958,10 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                     fmt.Printf("DELETE E: %v | %v\n", removeNextEdge, v.edges[removeNextEdge].ETwin)
 
+                    v.vertices[v.edges[removeNextEdge].VOrigin] = emptyV
+
                     v.edges[v.edges[removeNextEdge].ETwin] = emptyE
                     v.edges[removeNextEdge] = emptyE
-
-                    // Delete the vertex.
-                    v.vertices[v.edges[v.edges[chain.edgeP].ETwin].VOrigin] = emptyV
 
                     removeNextEdge = tmpRemoveNextEdge
 
@@ -968,7 +984,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                     tmpF := v.edges[v.edges[removeLastEdge].ETwin].FFace
                     if v.faces[tmpF].EEdge == v.edges[removeLastEdge].ETwin {
-                        v.faces[tmpF].EEdge = v.edges[v.edges[removeLastEdge].ETwin].ENext
+                        v.faces[tmpF].EEdge = v.edges[v.edges[removeLastEdge].ETwin].EPrev
                     }
 
                     if v.faces[v.edges[removeLastEdge].FFace].EEdge == removeLastEdge {
@@ -977,11 +993,10 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                     fmt.Printf("DELETE E: %v | %v\n", removeLastEdge, v.edges[removeLastEdge].ETwin)
 
+                    v.vertices[v.edges[v.edges[removeLastEdge].ETwin].VOrigin] = emptyV
+
                     v.edges[v.edges[removeLastEdge].ETwin] = emptyE
                     v.edges[removeLastEdge] = emptyE
-
-                    // Delete the vertex.
-                    v.vertices[vertex] = emptyV
 
                     removeLastEdge = tmpRemoveLastEdge
 
@@ -1606,7 +1621,7 @@ func testUnknownProblemSeed(seed int64, count int) {
     sort.Sort(pointList)
 
     //pointList = pointList[len(pointList)/2:]
-    //pointList = pointList[:len(pointList)/2]
+    //pointList = pointList[len(pointList)/2:]
 
     v := CreateVoronoi(pointList)
     v.pprint()
@@ -1653,6 +1668,7 @@ func testRandom(count int) {
 
 func main() {
 
+    g_drawImages = false
     working := true
 
     if working {
@@ -1681,6 +1697,7 @@ func main() {
         testUnknownProblemSeed(1483370130545841965, 15)
         testUnknownProblemSeed(1496121738043120503, 20)
         testUnknownProblemSeed(1496247478836154924, 40)
+        testUnknownProblemSeed(1496247359069208740, 50)
     }
 
     toBeVerified := false
@@ -1698,12 +1715,6 @@ func main() {
         fmt.Println("Test: testLinearDepentence03")
         testLinearDepentence03()
 
-        // works.
-        for i := 0; i < 20; i++ {
-            fmt.Println("Test: testRandom_", i)
-            testRandom(5)
-        }
-
     }
 
     crashes := false
@@ -1720,11 +1731,10 @@ func main() {
     }
 
     test := true
+    g_drawImages = true
 
     if test {
         //testRandom(40)
-        //testUnknownProblemSeed(1496247359069208740, 50)
-
     }
 
 }
