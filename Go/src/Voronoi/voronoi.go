@@ -16,6 +16,7 @@ import (
     "time"
     "strconv"
     "errors"
+    "container/list"
 )
 
 // HAS to be an infinite face!
@@ -45,6 +46,8 @@ type ChainElem struct {
 
 var g_recursions int = 0
 var g_drawImages bool = true;
+var g_freeEdgePositions = list.New()
+var g_lockedFreeEdgePositions = list.New()
 
 ////////////////////////////////////////////////////////////////////////
 //  Pretty Print the  Voronoi Attributes
@@ -522,14 +525,26 @@ func (v *Voronoi)createFace(refPoint Vector, eEdge EdgeIndex) FaceIndex {
         ReferencePoint: refPoint,
         EEdge:          eEdge,
     }
-    fmt.Println("face ", v.firstFreeFacePos, " == ", v.faces[v.firstFreeFacePos])
     v.firstFreeFacePos += 1
     return v.firstFreeFacePos-1
 }
 
 // So we can get a pointer of some data structure? What about scope issues?
 func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, ePrev, eNext EdgeIndex, fFace FaceIndex, tmpEdge Edge) EdgeIndex {
-    v.edges[v.firstFreeEdgePos] = HEEdge {
+
+    index := v.firstFreeEdgePos
+    if g_freeEdgePositions.Len() > 0 {
+        elem := g_freeEdgePositions.Front()
+        index = elem.Value.(EdgeIndex)
+        // Now, this has to be a O(1) operations, because we Always pop the very first element of the list!
+        // If the removal of the first element turns out to be O(n), we have to change to a better linked
+        // list implementation!
+        g_freeEdgePositions.Remove(elem)
+    } else {
+        v.firstFreeEdgePos += 1
+    }
+
+    v.edges[index] = HEEdge {
         VOrigin:    vOrigin,
         ETwin:      eTwin,
         ENext:      eNext,
@@ -537,8 +552,21 @@ func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, ePrev, eNext EdgeIndex, 
         FFace:      fFace,
         TmpEdge:    tmpEdge,
     }
-    v.firstFreeEdgePos += 1
-    return v.firstFreeEdgePos-1
+    return index
+}
+
+func (v *Voronoi)deleteEdgePair(e1, e2 EdgeIndex) {
+    emptyE := HEEdge{}
+    v.edges[e1]  = emptyE
+    v.edges[e2]  = emptyE
+    g_lockedFreeEdgePositions.PushBack(e1)
+    g_lockedFreeEdgePositions.PushBack(e2)
+}
+
+
+func makeRemovedEdgeMemoryAvailable() {
+    g_freeEdgePositions.PushBackList(g_lockedFreeEdgePositions)
+    g_lockedFreeEdgePositions.Init()
 }
 
 // So we can get a pointer of some data structure? What about scope issues?
@@ -555,7 +583,6 @@ func (v *Voronoi)createVertex(pos Vector) VertexIndex {
 // Returns the index of the convex hull list called upon.
 func (ch ConvexHull) bestFaceIndex(v *Voronoi, isBetter func(v1, v2 Vector) bool) int {
     bestFace := 0
-    //fmt.Println ("  bestFace:", ch)
     for i,_ := range ch {
         if isBetter(v.faces[ch[i]].ReferencePoint, v.faces[ch[bestFace]].ReferencePoint) {
             bestFace = i
@@ -566,9 +593,6 @@ func (ch ConvexHull) bestFaceIndex(v *Voronoi, isBetter func(v1, v2 Vector) bool
 
 // Creates a line from the HEEdge. Depeding on its state from the edge or the TmpEdge.
 func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
-
-
-
     switch {
         case !v.edges[e].VOrigin.Valid() && v.edges[v.edges[e].ETwin].VOrigin.Valid():
             edge := v.edges[e].TmpEdge
@@ -581,28 +605,11 @@ func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
         case !v.edges[e].VOrigin.Valid() && !v.edges[v.edges[e].ETwin].VOrigin.Valid():
              return Amplify(v.edges[e].TmpEdge, 50.0)
         default:
-            //fmt.Println("No problems here!!!!!!!!!!!!!!!!")
             return Edge {
                 Pos: v.vertices[v.edges[e].VOrigin].Pos,
                 Dir: Sub(v.vertices[v.edges[v.edges[e].ETwin].VOrigin].Pos, v.vertices[v.edges[e].VOrigin].Pos),
             }
     }
-
-    /*
-    if !v.edges[e].VOrigin.Valid() || !v.edges[v.edges[e].ETwin].VOrigin.Valid() {
-        if amplified {
-            return Amplify(v.edges[e].TmpEdge, 50.0)
-        } else {
-            return v.edges[e].TmpEdge
-        }
-    } else {
-        //fmt.Println("No problems here!!!!!!!!!!!!!!!!")
-        return Edge {
-            Pos: v.vertices[v.edges[e].VOrigin].Pos,
-            Dir: Sub(v.vertices[v.edges[v.edges[e].ETwin].VOrigin].Pos, v.vertices[v.edges[e].VOrigin].Pos),
-        }
-    }
-    */
 }
 
 // Calculates the highest intersection of the given bisector and any edge of the
@@ -709,6 +716,8 @@ func commonSupportLine(v *Voronoi, h1, h2 ConvexHull, betterSideL func(v1, v2 Ve
 // Helperfunctions for calculating the common support line.
 // Were anonymous functions, but sourced out because they where getting too long.
 func isBetterUp(v1, v2, test Vector) bool {
+    // if the test-vector is left of the line, created by v1-v2.
+    // Left means: on the upper side of the line (left).
     if IsLeft2D(v1, v2, test) {
         return true
     }
@@ -722,9 +731,11 @@ func isBetterDown(v1, v2, test Vector) bool {
     if IsRight2D(v1, v2, test) {
         return true
     }
+
     side := SideOfLine(v1, v2, test)
     if side <= EPS && side >= -EPS {
-        return test.X >= v1.X && test.X <= v2.X
+        //fmt.Printf("we get here.\n")
+        return test.X > v1.X && test.X < v2.X
     }
     return false
 }
@@ -736,10 +747,13 @@ func isBetterDown(v1, v2, test Vector) bool {
 func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem {
     var dividingChain []ChainElem
 
-    fmt.Printf("dividing chain for recursion: %v\n", g_recursions)
+    //fmt.Printf("dividing chain for recursion: %v\n", g_recursions)
 
     h1 := v.ConvexHull(left)
     h2 := v.ConvexHull(right)
+
+    fmt.Printf("h1: %v\n", h1)
+    fmt.Printf("h2: %v\n", h2)
 
     isRight := func(v1, v2 Vector) bool {
         return v1.X > v2.X
@@ -769,6 +783,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         //fmt.Printf("for with p == %v, q == %v\n", p, q)
         // Here we break out of the loop, when we reach the very bottom!
         lastMerge := p == h1Down && q == h2Down
+        fmt.Printf("p: %v, q: %v, h1Down: %v, h2Down: %v, lastMerge: %v\n", p, q, h1Down, h2Down, lastMerge)
 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
         //fmt.Printf("found P intersection\n")
@@ -780,12 +795,12 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
             case edgeP == EmptyEdge && edgeQ == EmptyEdge:
-                //fmt.Printf("e\n")
+                fmt.Printf("e\n")
                 dividingChain = append(dividingChain, ChainElem{Vector{}, EmptyEdge, EmptyEdge, p, q, bisector})
 
             // Equal Intersection with both edges. So 4 edges meet.
             case edgeQ != EmptyEdge && edgeP != EmptyEdge && Equal(locationP, locationQ):
-                //fmt.Printf("p && q\n")
+                fmt.Printf("p && q\n")
                 // This could result in kind of an invalid Delaunay triangulations. At least regarding a triangle.
                 // This should now work for situations, where 4 edges meet. I have to re-examine for even more edges meeting...
 
@@ -800,7 +815,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face p
             case edgeP != EmptyEdge && (edgeQ == EmptyEdge || locationP.Y >= locationQ.Y):
-                //fmt.Printf("p\n")
+                fmt.Printf("p\n")
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, EmptyEdge, p, q, bisector})
 
                 lastVertex   = locationP
@@ -811,7 +826,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face q
             case edgeQ != EmptyEdge && (edgeP == EmptyEdge || locationQ.Y >= locationP.Y):
-                //fmt.Printf("q\n")
+                fmt.Printf("q\n")
                 dividingChain = append(dividingChain, ChainElem{locationQ, EmptyEdge, edgeQ, p, q, bisector})
 
                 lastVertex   = locationQ
@@ -862,12 +877,12 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
     chainList := v.extractDividingChain(left, right)
 
+    //fmt.Printf("chainList: %v\n", chainList)
+
     // Iterating through the dividing chain and actually merge the voronois.
     for i,chain := range chainList {
 
-        //gotNewQ = i == 0 || chain.edgeQ != EmptyEdge
-
-        fmt.Printf("i == %v\n", i)
+        //fmt.Printf("i == %v\n", i)
         heVertex := EmptyVertex
         if chain.intersection != (Vector{}) {
 
@@ -885,6 +900,9 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
         heEdgeUp   := v.createEdge(heVertex,   EmptyEdge, chain.edgeP,  nextPEdge,   chain.p, otherWayBisector)
         heEdgeDown := v.createEdge(lastVertex, heEdgeUp,  lastDownEdge, chain.edgeQ, chain.q, chain.bisector)
         v.edges[heEdgeUp].ETwin = heEdgeDown
+
+        //fmt.Printf("heEdgeUp  : %v\n", v.edges[heEdgeUp])
+        //fmt.Printf("heEdgeDown: %v\n", v.edges[heEdgeDown])
 
         if lastDownEdge != EmptyEdge {
             v.edges[lastDownEdge].ENext = heEdgeDown
@@ -930,7 +948,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             vertex := v.edges[v.edges[chain.edgeP].ETwin].VOrigin
 
             if vertex.Valid() && v.vertices[vertex] != emptyV {
-                fmt.Printf("    ----> Found a vertex that has do be deleted (P) (v-index: %v - %v)\n", vertex, v.vertices[vertex].Pos)
+                //fmt.Printf("    ----> Found a vertex that has do be deleted (P) (v-index: %v - %v)\n", vertex, v.vertices[vertex].Pos)
 
                 removeNextEdge := v.edges[chain.edgeP].ENext
 
@@ -957,8 +975,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                     v.vertices[v.edges[removeNextEdge].VOrigin] = emptyV
 
-                    v.edges[v.edges[removeNextEdge].ETwin] = emptyE
-                    v.edges[removeNextEdge] = emptyE
+                    v.deleteEdgePair(v.edges[removeNextEdge].ETwin, removeNextEdge)
 
                     removeNextEdge = tmpRemoveNextEdge
 
@@ -971,7 +988,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
             // Delete vertices that overlap with the other side (to the left)!
             vertex := v.edges[chain.edgeQ].VOrigin
             if vertex.Valid() && v.vertices[vertex] != emptyV {
-                fmt.Printf("    ----> Found a vertex that has do be deleted (Q) (v-index: %v)\n", vertex)
+                //fmt.Printf("    ----> Found a vertex that has do be deleted (Q) (v-index: %v)\n", vertex)
 
                 removeLastEdge := v.edges[chain.edgeQ].EPrev
 
@@ -992,8 +1009,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                     v.vertices[v.edges[v.edges[removeLastEdge].ETwin].VOrigin] = emptyV
 
-                    v.edges[v.edges[removeLastEdge].ETwin] = emptyE
-                    v.edges[removeLastEdge] = emptyE
+                    v.deleteEdgePair(v.edges[removeLastEdge].ETwin, removeLastEdge)
 
                     removeLastEdge = tmpRemoveLastEdge
 
@@ -1029,6 +1045,8 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
     }
 
+    //makeRemovedEdgeMemoryAvailable()
+
     fmt.Printf("FINISHED MERGE OF %v AND %v\n\n", left, right)
 
     return left
@@ -1055,9 +1073,9 @@ func CreateVoronoi(pointList PointList) Voronoi {
     // See: http://www.cs.wustl.edu/~pless/546/lectures/L11.html
     // for the calculations of maximum voronoi object count.
     v := Voronoi {
-        vertices:           make([]HEVertex, 2*n-5 + 3 + 100000),
+        vertices:           make([]HEVertex, 2*n-5 + 3 + 200000),
         firstFreeVertexPos: 0,
-        edges:              make([]HEEdge, 2*(3*n-6) + 6 + 100000),
+        edges:              make([]HEEdge, 2*(3*n-6) + 6 + 200000),
         firstFreeEdgePos:   0,
         faces:              make([]HEFace, n),
         firstFreeFacePos:   0,
@@ -1190,16 +1208,21 @@ func testEqualIntersection02() {
 //
 // Test cases with linear dependent points or lines
 //
-func testLinearDepentence01() {
+func testLinearDepentence01a() {
     fmt.Printf("=============================\n")
     fmt.Printf("=== test_linear_dependence_01\n")
     fmt.Printf("=============================\n")
     var pointList PointList
 
-    pointList = append(pointList, Vector{20, 10, 0})
-    pointList = append(pointList, Vector{30, 10, 0})
-    pointList = append(pointList, Vector{40, 10, 0})
-    pointList = append(pointList, Vector{50, 10, 0})
+    pointList = append(pointList, Vector{20, 70, 0})
+    pointList = append(pointList, Vector{30, 70, 0})
+    pointList = append(pointList, Vector{40, 70, 0})
+    pointList = append(pointList, Vector{50, 70, 0})
+
+    pointList[0].Y -= 1;
+    pointList[3].Y -= 1;
+
+    //pointList = pointList[:len(pointList)/2]
 
     v := CreateVoronoi(pointList)
     v.pprint()
@@ -1207,7 +1230,32 @@ func testLinearDepentence01() {
     ch := v.ConvexHull(0)
     fmt.Println(ch)
 
-    v.createImage("test_linear_dependence_01", true)
+    v.createImage("test_linear_dependence_01a", true)
+}
+
+func testLinearDepentence01b() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_linear_dependence_01\n")
+    fmt.Printf("=============================\n")
+    var pointList PointList
+
+    pointList = append(pointList, Vector{20, 70, 0})
+    pointList = append(pointList, Vector{30, 70, 0})
+    pointList = append(pointList, Vector{40, 70, 0})
+    pointList = append(pointList, Vector{50, 70, 0})
+
+    //pointList[0].Y -= 1;
+    //pointList[3].Y -= 1;
+
+    //pointList = pointList[:len(pointList)/2]
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_linear_dependence_01b", true)
 }
 
 func testLinearDepentence02() {
@@ -1627,9 +1675,6 @@ func testUnknownProblemSeed(seed int64, count int) {
     fmt.Println(ch)
 
     v.createImage("test_unknown_problem_seed_" + strconv.FormatInt(seed, 10), true)
-
-    //v.drawFaces()
-
 }
 
 //
@@ -1666,7 +1711,7 @@ func testRandom(count int) {
 func main() {
 
     g_drawImages = false
-    working := false
+    working := true
 
     if working {
         testNormal01()
@@ -1689,7 +1734,7 @@ func main() {
         testUnknownProblemSeed(1483369884537650258, 20)
         testUnknownProblemSeed(1483370089898481236, 15)
         testUnknownProblem05()
-        testUnknownProblem02()
+        //testUnknownProblem02()
         testUnknownProblemSeed(1483370150842201370, 15)
         testUnknownProblemSeed(1483370130545841965, 15)
         testUnknownProblemSeed(1496121738043120503, 20)
@@ -1697,13 +1742,14 @@ func main() {
         testUnknownProblemSeed(1496247359069208740, 50)
         testUnknownProblemSeed(1496294040279258517, 100)
         testUnknownProblemSeed(1496294255661064215, 500)
+        testUnknownProblemSeed(1496295030863743777, 10000)
     }
 
     toBeVerified := false
 
     if toBeVerified {
 
-        testLinearDepentence01()
+        testLinearDepentence01a()
         // works.
         // A first edge {-1 0 6 1 {{35 510 0} {0 -1000 0}}}: 1 must be referenced as first edge by the corresponding face 1 !
         fmt.Println("Test: testLinearDepentence02")
@@ -1729,12 +1775,14 @@ func main() {
 
     }
 
-    test := true
+    test := false
     g_drawImages = true
 
     if test {
         //testRandom(10000)
-        testUnknownProblemSeed(1496295030863743777, 10000)
+        //testLinearDepentence01a()
+        //testLinearDepentence01b()
+        testUnknownProblem02()
     }
 
 }

@@ -266,11 +266,18 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
             //fmt.Println(".... So maybe infinity? Hmpf")
             // Some kind of infinity stuff-Point??
             // I could just say, they intersect in like 1000-distance.
-            return true, InfinitePoint
+
+
+            //return true, InfinitePoint
+            fmt.Printf("instead of Infinity: %v \n", Add(e1.Pos, e1.Dir))
+            return true, Add(Mult(Add(e1.Pos, e2.Pos), 0.5), e1.Dir)
+
             //return false, Vector{}
         }
 
-        return true, InfinitePoint
+        //return true, InfinitePoint
+        fmt.Printf("instead of Infinity: %v \n", Add(e1.Pos, e1.Dir))
+        return true, Add(Mult(Add(e1.Pos, e2.Pos), 0.5), e1.Dir)
         //return false, Vector{}
     }
 
