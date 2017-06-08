@@ -46,6 +46,7 @@ type ChainElem struct {
 
 var g_recursions int = 0
 var g_drawImages bool = true;
+var g_pprint bool = true;
 var g_freeEdgePositions = list.New()
 var g_lockedFreeEdgePositions = list.New()
 
@@ -54,6 +55,9 @@ var g_lockedFreeEdgePositions = list.New()
 ////////////////////////////////////////////////////////////////////////
 
 func (v *Voronoi) pprint () {
+    if !g_pprint {
+        return
+    }
     fmt.Println("Voronoi:")
     fmt.Printf("   Vertices (%v):\n", v.firstFreeVertexPos)
     var dummyV HEVertex
@@ -557,6 +561,21 @@ func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, ePrev, eNext EdgeIndex, 
 
 func (v *Voronoi)deleteEdgePair(e1, e2 EdgeIndex) {
     emptyE := HEEdge{}
+    // Delete all references to the edges.
+    if v.edges[e1].EPrev != EmptyEdge && v.edges[v.edges[e1].EPrev].ENext == e1 {
+       v.edges[v.edges[e1].EPrev].ENext = EmptyEdge
+    }
+    if v.edges[e1].ENext != EmptyEdge && v.edges[v.edges[e1].ENext].EPrev == e1 {
+       v.edges[v.edges[e1].ENext].EPrev = EmptyEdge
+    }
+    if v.edges[e2].EPrev != EmptyEdge && v.edges[v.edges[e2].EPrev].ENext == e2 {
+       v.edges[v.edges[e2].EPrev].ENext = EmptyEdge
+    }
+    if v.edges[e2].ENext != EmptyEdge && v.edges[v.edges[e2].ENext].EPrev == e2 {
+       v.edges[v.edges[e2].ENext].EPrev = EmptyEdge
+    }
+
+    // Delete the edges themself.
     v.edges[e1]  = emptyE
     v.edges[e2]  = emptyE
     g_lockedFreeEdgePositions.PushBack(e1)
@@ -783,7 +802,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         //fmt.Printf("for with p == %v, q == %v\n", p, q)
         // Here we break out of the loop, when we reach the very bottom!
         lastMerge := p == h1Down && q == h2Down
-        fmt.Printf("p: %v, q: %v, h1Down: %v, h2Down: %v, lastMerge: %v\n", p, q, h1Down, h2Down, lastMerge)
+        //fmt.Printf("p: %v, q: %v, h1Down: %v, h2Down: %v, lastMerge: %v\n", p, q, h1Down, h2Down, lastMerge)
 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
         //fmt.Printf("found P intersection\n")
@@ -795,7 +814,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
             case edgeP == EmptyEdge && edgeQ == EmptyEdge:
-                fmt.Printf("e\n")
+                //fmt.Printf("e\n")
                 dividingChain = append(dividingChain, ChainElem{Vector{}, EmptyEdge, EmptyEdge, p, q, bisector})
 
             // Equal Intersection with both edges. So 4 edges meet.
@@ -1080,6 +1099,16 @@ func CreateVoronoi(pointList PointList) Voronoi {
         faces:              make([]HEFace, n),
         firstFreeFacePos:   0,
     }
+
+    //for i,_ := range v.vertices {
+    //    v.vertices[i] = HEVertex{Vector{-1, -1, -1}}
+    //}
+    //for i,_ := range v.edges {
+    //    v.edges[i] = HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
+    //}
+    //for i,_ := range v.faces {
+    //    v.faces[i] = HEFace{Vector{-1, -1, -1}, -1}
+    //}
 
     v.divideAndConquer(pointList)
 
@@ -1711,6 +1740,7 @@ func testRandom(count int) {
 func main() {
 
     g_drawImages = false
+    g_pprint = false
     working := true
 
     if working {
