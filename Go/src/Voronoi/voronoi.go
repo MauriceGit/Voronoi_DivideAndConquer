@@ -50,6 +50,11 @@ var g_pprint bool = true;
 var g_freeEdgePositions = list.New()
 var g_lockedFreeEdgePositions = list.New()
 
+var emptyVector = Vector{-1, -1, -1}
+var emptyF = HEFace{emptyVector, -1}
+var emptyE = HEEdge{-1, -1, -1, -1, -1, Edge{emptyVector, emptyVector}}
+var emptyV = HEVertex{emptyVector}
+
 ////////////////////////////////////////////////////////////////////////
 //  Pretty Print the  Voronoi Attributes
 ////////////////////////////////////////////////////////////////////////
@@ -60,30 +65,25 @@ func (v *Voronoi) pprint () {
     }
     fmt.Println("Voronoi:")
     fmt.Printf("   Vertices (%v):\n", v.firstFreeVertexPos)
-    //var dummyV HEVertex
-    dummyV := HEVertex{Vector{-1, -1, -1}}
+
     for i,ve := range v.vertices {
-        if ve != dummyV {
+        if ve != emptyV {
             fmt.Printf("\t%v:\tPos: %v\n", i, ve.Pos)
         }
     }
     fmt.Printf("\n")
 
     fmt.Printf("   Edges    (%v):\n", v.firstFreeEdgePos)
-    //var dummyE HEEdge
-    dummyE := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
     for i,e := range v.edges {
-        if e != dummyE {
+        if e != emptyE {
             fmt.Printf("\t%v:\tOrigin: %v,\tTwin: %v,\tPrev: %v,\tNext: %v,\tFace: %v\n", i, e.VOrigin, e.ETwin, e.EPrev, e.ENext, e.FFace)
         }
     }
     fmt.Printf("\n")
 
     fmt.Printf("   Faces    (%v):\n", v.firstFreeFacePos)
-    //var dummyF HEFace
-    dummyF := HEFace{Vector{-1, -1, -1}, -1}
     for i,f := range v.faces {
-        if f != dummyF {
+        if f != emptyF {
             fmt.Printf("\t%v:\tRefPoint: %v,\tEdge:%v\n", i, f.ReferencePoint, f.EEdge)
         }
     }
@@ -566,6 +566,8 @@ func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, ePrev, eNext EdgeIndex, 
 }
 
 func (v *Voronoi)deleteEdgePair(e1, e2 EdgeIndex) {
+    fmt.Printf("DELETE E: %v | %v\n", e1, e2)
+
     emptyE := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
     // Delete all references to the edges.
     if v.edges[e1].EPrev != EmptyEdge && v.edges[v.edges[e1].EPrev].ENext == e1 {
@@ -588,10 +590,18 @@ func (v *Voronoi)deleteEdgePair(e1, e2 EdgeIndex) {
     g_lockedFreeEdgePositions.PushBack(e2)
 }
 
+func (v *Voronoi)deleteVertex(ve VertexIndex) {
+    fmt.Printf("DELETE V: %v\n", ve)
+    v.vertices[ve] = emptyV
+}
 
 func makeRemovedEdgeMemoryAvailable() {
     g_freeEdgePositions.PushBackList(g_lockedFreeEdgePositions)
     g_lockedFreeEdgePositions.Init()
+
+    //fmt.Printf("free   edge positions: %v\n", g_freeEdgePositions)
+    //fmt.Printf("locked edge positions: %v\n", g_lockedFreeEdgePositions)
+
 }
 
 // So we can get a pointer of some data structure? What about scope issues?
@@ -1000,8 +1010,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
                     fmt.Printf("DELETE E: %v | %v\n", removeNextEdge, v.edges[removeNextEdge].ETwin)
 
-                    v.vertices[v.edges[removeNextEdge].VOrigin] = emptyV
-
+                    v.deleteVertex(v.edges[removeNextEdge].VOrigin)
                     v.deleteEdgePair(v.edges[removeNextEdge].ETwin, removeNextEdge)
 
                     removeNextEdge = tmpRemoveNextEdge
@@ -1032,10 +1041,7 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
                         v.faces[v.edges[removeLastEdge].FFace].EEdge = heEdgeDown
                     }
 
-                    fmt.Printf("DELETE E: %v | %v\n", removeLastEdge, v.edges[removeLastEdge].ETwin)
-
-                    v.vertices[v.edges[v.edges[removeLastEdge].ETwin].VOrigin] = emptyV
-
+                    v.deleteVertex(v.edges[v.edges[removeLastEdge].ETwin].VOrigin)
                     v.deleteEdgePair(v.edges[removeLastEdge].ETwin, removeLastEdge)
 
                     removeLastEdge = tmpRemoveLastEdge
