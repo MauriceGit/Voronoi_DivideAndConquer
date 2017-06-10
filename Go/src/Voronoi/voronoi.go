@@ -60,7 +60,8 @@ func (v *Voronoi) pprint () {
     }
     fmt.Println("Voronoi:")
     fmt.Printf("   Vertices (%v):\n", v.firstFreeVertexPos)
-    var dummyV HEVertex
+    //var dummyV HEVertex
+    dummyV := HEVertex{Vector{-1, -1, -1}}
     for i,ve := range v.vertices {
         if ve != dummyV {
             fmt.Printf("\t%v:\tPos: %v\n", i, ve.Pos)
@@ -69,7 +70,8 @@ func (v *Voronoi) pprint () {
     fmt.Printf("\n")
 
     fmt.Printf("   Edges    (%v):\n", v.firstFreeEdgePos)
-    var dummyE HEEdge
+    //var dummyE HEEdge
+    dummyE := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
     for i,e := range v.edges {
         if e != dummyE {
             fmt.Printf("\t%v:\tOrigin: %v,\tTwin: %v,\tPrev: %v,\tNext: %v,\tFace: %v\n", i, e.VOrigin, e.ETwin, e.EPrev, e.ENext, e.FFace)
@@ -78,7 +80,8 @@ func (v *Voronoi) pprint () {
     fmt.Printf("\n")
 
     fmt.Printf("   Faces    (%v):\n", v.firstFreeFacePos)
-    var dummyF HEFace
+    //var dummyF HEFace
+    dummyF := HEFace{Vector{-1, -1, -1}, -1}
     for i,f := range v.faces {
         if f != dummyF {
             fmt.Printf("\t%v:\tRefPoint: %v,\tEdge:%v\n", i, f.ReferencePoint, f.EEdge)
@@ -137,7 +140,8 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     gc.SetStrokeColor(c)
 
     for i,e := range v.edges {
-        var tmp HEEdge
+        //var tmp HEEdge
+        tmp := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
         e2   := v.edges[e.ETwin]
         if e != tmp && e2 != tmp {
 
@@ -205,7 +209,8 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     // Vertices between edges
     c = color.RGBA{0,255,0,255}
     for _,ve := range v.vertices {
-        var tmp HEVertex
+        //var tmp HEVertex
+        tmp := HEVertex{Vector{-1, -1, -1}}
         if ve != tmp {
             drawCircle(m, int(ve.Pos.X*scale), h-int(ve.Pos.Y*scale), 2, c)
         }
@@ -250,7 +255,8 @@ func drawEdgeList(v *Voronoi, edges []EdgeIndex, filename string) {
 
         e := v.edges[eI]
 
-        var tmp HEEdge
+        //var tmp HEEdge
+        tmp := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
         e2   := v.edges[e.ETwin]
         if e != tmp && e2 != tmp {
 
@@ -381,9 +387,9 @@ func drawDividingChain(chain []ChainElem) {
 // or any other unvalid stuff.
 func (v *Voronoi) Verify() error {
 
-    emptyF := HEFace{}
-    emptyE := HEEdge{}
-    emptyV := HEVertex{}
+    emptyF := HEFace{Vector{-1, -1, -1}, -1}
+    emptyE := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
+    emptyV := HEVertex{Vector{-1, -1, -1}}
 
     for i,e := range v.edges {
         if e != emptyE {
@@ -560,7 +566,7 @@ func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, ePrev, eNext EdgeIndex, 
 }
 
 func (v *Voronoi)deleteEdgePair(e1, e2 EdgeIndex) {
-    emptyE := HEEdge{}
+    emptyE := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
     // Delete all references to the edges.
     if v.edges[e1].EPrev != EmptyEdge && v.edges[v.edges[e1].EPrev].ENext == e1 {
        v.edges[v.edges[e1].EPrev].ENext = EmptyEdge
@@ -882,8 +888,10 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 // Here two not overlapping voronoi diagrams are merged.
 // They HAVE to be left/right of each other with NO overlapping. This HAS to be guaranteed!
 func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
-    var emptyV HEVertex
-    var emptyE HEEdge
+    //var emptyV HEVertex
+    //var emptyE HEEdge
+    emptyV := HEVertex{Vector{-1, -1, -1}}
+    emptyE := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
 
     g_recursions += 1;
 
@@ -1100,15 +1108,15 @@ func CreateVoronoi(pointList PointList) Voronoi {
         firstFreeFacePos:   0,
     }
 
-    //for i,_ := range v.vertices {
-    //    v.vertices[i] = HEVertex{Vector{-1, -1, -1}}
-    //}
-    //for i,_ := range v.edges {
-    //    v.edges[i] = HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
-    //}
-    //for i,_ := range v.faces {
-    //    v.faces[i] = HEFace{Vector{-1, -1, -1}, -1}
-    //}
+    for i,_ := range v.vertices {
+        v.vertices[i] = HEVertex{Vector{-1, -1, -1}}
+    }
+    for i,_ := range v.edges {
+        v.edges[i] = HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
+    }
+    for i,_ := range v.faces {
+        v.faces[i] = HEFace{Vector{-1, -1, -1}, -1}
+    }
 
     v.divideAndConquer(pointList)
 
