@@ -50,10 +50,14 @@ var g_pprint bool = true;
 var g_freeEdgePositions = list.New()
 var g_freeVertexPositions = list.New()
 
-var emptyVector = Vector{-1, -1, -1}
-var emptyF = HEFace{emptyVector, -1}
-var emptyE = HEEdge{-1, -1, -1, -1, -1, Edge{emptyVector, emptyVector}}
-var emptyV = HEVertex{emptyVector}
+//var emptyVector = Vector{-1, -1, -1}
+//var emptyF = HEFace{emptyVector, -1}
+//var emptyE = HEEdge{-1, -1, -1, -1, -1, Edge{emptyVector, emptyVector}}
+//var emptyV = HEVertex{emptyVector}
+
+var emptyF = HEFace{}
+var emptyE = HEEdge{}
+var emptyV = HEVertex{}
 
 ////////////////////////////////////////////////////////////////////////
 //  Pretty Print the  Voronoi Attributes
@@ -1106,15 +1110,15 @@ func CreateVoronoi(pointList PointList) Voronoi {
         firstFreeFacePos:   0,
     }
 
-    for i,_ := range v.vertices {
-        v.vertices[i] = emptyV
-    }
-    for i,_ := range v.edges {
-        v.edges[i] = emptyE
-    }
-    for i,_ := range v.faces {
-        v.faces[i] = emptyF
-    }
+    //for i,_ := range v.vertices {
+    //    v.vertices[i] = emptyV
+    //}
+    //for i,_ := range v.edges {
+    //    v.edges[i] = emptyE
+    //}
+    //for i,_ := range v.faces {
+    //    v.faces[i] = emptyF
+    //}
 
     g_freeEdgePositions.Init()
     g_freeVertexPositions.Init()
