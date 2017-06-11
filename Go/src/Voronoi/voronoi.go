@@ -48,7 +48,7 @@ var g_recursions int = 0
 var g_drawImages bool = true;
 var g_pprint bool = true;
 var g_freeEdgePositions = list.New()
-var g_lockedFreeEdgePositions = list.New()
+var g_freeVertexPositions = list.New()
 
 var emptyVector = Vector{-1, -1, -1}
 var emptyF = HEFace{emptyVector, -1}
@@ -140,55 +140,55 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     gc.SetStrokeColor(c)
 
     for i,e := range v.edges {
-        //var tmp HEEdge
-        tmp := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
-        e2   := v.edges[e.ETwin]
-        if e != tmp && e2 != tmp {
+        if e != emptyE {
+            e2   := v.edges[e.ETwin]
+            if e2 != emptyE {
 
-            edge := Edge{}
-            v1   := e.VOrigin
-            v2   := e2.VOrigin
-            switch {
-                // Best case. We have both endpoints. And none of them Infinity ones.
-                case v1.Valid() && v2.Valid() && v.vertices[v1].Pos != InfinitePoint && v.vertices[v2].Pos != InfinitePoint:
-                    //fmt.Printf("Edge in question: \n\t%v\n\t%v\n\t%v, %v\n", e, e2, v1, v2)
-                    edge = Edge{v.vertices[v1].Pos, Sub(v.vertices[v1].Pos, v.vertices[v2].Pos)}
+                edge := Edge{}
+                v1   := e.VOrigin
+                v2   := e2.VOrigin
+                switch {
+                    // Best case. We have both endpoints. And none of them Infinity ones.
+                    case v1.Valid() && v2.Valid() && v.vertices[v1].Pos != InfinitePoint && v.vertices[v2].Pos != InfinitePoint:
+                        //fmt.Printf("Edge in question: \n\t%v\n\t%v\n\t%v, %v\n", e, e2, v1, v2)
+                        edge = Edge{v.vertices[v1].Pos, Sub(v.vertices[v1].Pos, v.vertices[v2].Pos)}
 
-                // We have the "left" endpoint.
-                case v1.Valid() && v.vertices[v1].Pos != InfinitePoint && !v2.Valid():
-                    edge = Edge{v.vertices[v1].Pos, e.TmpEdge.Dir}
+                    // We have the "left" endpoint.
+                    case v1.Valid() && v.vertices[v1].Pos != InfinitePoint && !v2.Valid():
+                        edge = Edge{v.vertices[v1].Pos, e.TmpEdge.Dir}
 
-                // We have the "right" endpoint.
-                case !v1.Valid() && v2.Valid() && v.vertices[v2].Pos != InfinitePoint:
-                    edge = Edge{v.vertices[v2].Pos, e2.TmpEdge.Dir}
+                    // We have the "right" endpoint.
+                    case !v1.Valid() && v2.Valid() && v.vertices[v2].Pos != InfinitePoint:
+                        edge = Edge{v.vertices[v2].Pos, e2.TmpEdge.Dir}
 
-                // We don't have any endpoints.
-                default:
-                    //i = i
-                    // amplified line. Exceeding all boundaries. Infinite line.
-                    edge = createLine(v, EdgeIndex(i), false)
+                    // We don't have any endpoints.
+                    default:
+                        //i = i
+                        // amplified line. Exceeding all boundaries. Infinite line.
+                        edge = createLine(v, EdgeIndex(i), false)
+                }
+
+
+
+                if edge == (Edge{}) {
+                    //continue
+                }
+
+                if i == 50 || i == 51 {
+                    //fmt.Printf("coloring now for something\n")
+                    //tmpC := color.RGBA{0,0,0,255}
+                    //gc.SetStrokeColor(tmpC)
+                } else {
+                    //gc.SetStrokeColor(c)
+                }
+
+                //fmt.Printf("From %v|%v ----> %v|%v\n", edge.Pos.X*scale., float64(h) - edge.Pos.Y*scale., Add(edge.Pos, edge.Dir).X*scale., float64(h) - Add(edge.Pos, edge.Dir).Y*scale.)
+
+                gc.MoveTo(edge.Pos.X*scale, float64(h) - edge.Pos.Y*scale)
+                gc.LineTo(Add(edge.Pos, edge.Dir).X*scale, float64(h) - Add(edge.Pos, edge.Dir).Y*scale)
+                gc.FillStroke()
+                gc.Close()
             }
-
-
-
-            if edge == (Edge{}) {
-                //continue
-            }
-
-            if i == 50 || i == 51 {
-                //fmt.Printf("coloring now for something\n")
-                //tmpC := color.RGBA{0,0,0,255}
-                //gc.SetStrokeColor(tmpC)
-            } else {
-                //gc.SetStrokeColor(c)
-            }
-
-            //fmt.Printf("From %v|%v ----> %v|%v\n", edge.Pos.X*scale., float64(h) - edge.Pos.Y*scale., Add(edge.Pos, edge.Dir).X*scale., float64(h) - Add(edge.Pos, edge.Dir).Y*scale.)
-
-            gc.MoveTo(edge.Pos.X*scale, float64(h) - edge.Pos.Y*scale)
-            gc.LineTo(Add(edge.Pos, edge.Dir).X*scale, float64(h) - Add(edge.Pos, edge.Dir).Y*scale)
-            gc.FillStroke()
-            gc.Close()
         }
     }
 
@@ -209,9 +209,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     // Vertices between edges
     c = color.RGBA{0,255,0,255}
     for _,ve := range v.vertices {
-        //var tmp HEVertex
-        tmp := HEVertex{Vector{-1, -1, -1}}
-        if ve != tmp {
+        if ve != emptyV {
             drawCircle(m, int(ve.Pos.X*scale), h-int(ve.Pos.Y*scale), 2, c)
         }
     }
@@ -386,10 +384,6 @@ func drawDividingChain(chain []ChainElem) {
 // Verifies that the Voronoi is not corrupted or has miscalculated edges/faces
 // or any other unvalid stuff.
 func (v *Voronoi) Verify() error {
-
-    emptyF := HEFace{Vector{-1, -1, -1}, -1}
-    emptyE := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
-    emptyV := HEVertex{Vector{-1, -1, -1}}
 
     for i,e := range v.edges {
         if e != emptyE {
@@ -568,7 +562,6 @@ func (v *Voronoi)createEdge(vOrigin VertexIndex, eTwin, ePrev, eNext EdgeIndex, 
 func (v *Voronoi)deleteEdgePair(e1, e2 EdgeIndex) {
     fmt.Printf("DELETE E: %v | %v\n", e1, e2)
 
-    emptyE := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
     // Delete all references to the edges.
     if v.edges[e1].EPrev != EmptyEdge && v.edges[v.edges[e1].EPrev].ENext == e1 {
        v.edges[v.edges[e1].EPrev].ENext = EmptyEdge
@@ -586,31 +579,36 @@ func (v *Voronoi)deleteEdgePair(e1, e2 EdgeIndex) {
     // Delete the edges themself.
     v.edges[e1]  = emptyE
     v.edges[e2]  = emptyE
-    g_lockedFreeEdgePositions.PushBack(e1)
-    g_lockedFreeEdgePositions.PushBack(e2)
+    g_freeEdgePositions.PushBack(e1)
+    g_freeEdgePositions.PushBack(e2)
 }
 
 func (v *Voronoi)deleteVertex(ve VertexIndex) {
     fmt.Printf("DELETE V: %v\n", ve)
     v.vertices[ve] = emptyV
-}
 
-func makeRemovedEdgeMemoryAvailable() {
-    g_freeEdgePositions.PushBackList(g_lockedFreeEdgePositions)
-    g_lockedFreeEdgePositions.Init()
-
-    //fmt.Printf("free   edge positions: %v\n", g_freeEdgePositions)
-    //fmt.Printf("locked edge positions: %v\n", g_lockedFreeEdgePositions)
-
+    g_freeVertexPositions.PushBack(ve)
 }
 
 // So we can get a pointer of some data structure? What about scope issues?
 func (v *Voronoi)createVertex(pos Vector) VertexIndex {
-    v.vertices[v.firstFreeVertexPos] = HEVertex {
+    index := v.firstFreeVertexPos
+    if g_freeVertexPositions.Len() > 0 {
+        elem := g_freeVertexPositions.Front()
+        index = elem.Value.(VertexIndex)
+        // Now, this has to be a O(1) operations, because we Always pop the very first element of the list!
+        // If the removal of the first element turns out to be O(n), we have to change to a better linked
+        // list implementation!
+        g_freeVertexPositions.Remove(elem)
+    } else {
+        v.firstFreeVertexPos += 1
+    }
+
+    v.vertices[index] = HEVertex {
         Pos:        pos,
     }
-    v.firstFreeVertexPos += 1
-    return v.firstFreeVertexPos-1
+
+    return index
 }
 
 // Calculates the face with the 'best' (y-coord) reference point.
@@ -898,10 +896,6 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 // Here two not overlapping voronoi diagrams are merged.
 // They HAVE to be left/right of each other with NO overlapping. This HAS to be guaranteed!
 func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
-    //var emptyV HEVertex
-    //var emptyE HEEdge
-    emptyV := HEVertex{Vector{-1, -1, -1}}
-    emptyE := HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
 
     g_recursions += 1;
 
@@ -1078,8 +1072,6 @@ func (v *Voronoi)mergeVoronoi(left, right VoronoiEntryFace) VoronoiEntryFace {
 
     }
 
-    //makeRemovedEdgeMemoryAvailable()
-
     fmt.Printf("FINISHED MERGE OF %v AND %v\n\n", left, right)
 
     return left
@@ -1106,23 +1098,26 @@ func CreateVoronoi(pointList PointList) Voronoi {
     // See: http://www.cs.wustl.edu/~pless/546/lectures/L11.html
     // for the calculations of maximum voronoi object count.
     v := Voronoi {
-        vertices:           make([]HEVertex, 2*n-5 + 3 + 200000),
+        vertices:           make([]HEVertex, 2*n-5 + 3),
         firstFreeVertexPos: 0,
-        edges:              make([]HEEdge, 2*(3*n-6) + 6 + 200000),
+        edges:              make([]HEEdge, 2*(3*n-6) + 6),
         firstFreeEdgePos:   0,
         faces:              make([]HEFace, n),
         firstFreeFacePos:   0,
     }
 
     for i,_ := range v.vertices {
-        v.vertices[i] = HEVertex{Vector{-1, -1, -1}}
+        v.vertices[i] = emptyV
     }
     for i,_ := range v.edges {
-        v.edges[i] = HEEdge{-1, -1, -1, -1, -1, Edge{Vector{-1, -1, -1}, Vector{-1, -1, -1}}}
+        v.edges[i] = emptyE
     }
     for i,_ := range v.faces {
-        v.faces[i] = HEFace{Vector{-1, -1, -1}, -1}
+        v.faces[i] = emptyF
     }
+
+    g_freeEdgePositions.Init()
+    g_freeVertexPositions.Init()
 
     v.divideAndConquer(pointList)
 
@@ -1803,19 +1798,6 @@ func main() {
         // A first edge {-2 1 -1 1 {{35 510 0} {-0 1000 -0}}}: 0 must be referenced as first edge by the corresponding face 1 !
         fmt.Println("Test: testLinearDepentence03")
         testLinearDepentence03()
-
-    }
-
-    crashes := false
-
-    if crashes {
-        // Both crashes can be resolved by increasing the static size for vertices
-        // and edges.
-        // Idea: Add an additional list for vertices, edges and faces (?) that contain a list
-        // of free additional positions for new vertices/edges.
-        // On those lists, only prepend-operations will be done [O(1)].
-        // If len(list) > 0, we just take the first additional free position. That way, we
-        // never get over the max list size and do not get additional time other than O(1).
 
     }
 
