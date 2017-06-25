@@ -157,7 +157,7 @@ func LineIntersection1(e1 Edge, e2 Edge) (bool, Vector) {
     ydiff := Vector{X: e1.Dir.Y, Y: e2.Dir.Y}
 
     div := Det2D(xdiff, ydiff)
-    if div <= 0.0001 {
+    if div <= EPS {
         fmt.Println("Lines do NOT intersect!")
         return false, Vector{}
     }
@@ -269,16 +269,16 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
 
 
             //return true, InfinitePoint
-            fmt.Printf("instead of Infinity: %v \n", Add(e1.Pos, e1.Dir))
-            return true, Add(Mult(Add(e1.Pos, e2.Pos), 0.5), e1.Dir)
+            //fmt.Printf("instead of Infinity: %v \n", Add(e1.Pos, e1.Dir))
+            //return true, Add(Mult(Add(e1.Pos, e2.Pos), 0.5), e1.Dir)
 
-            //return false, Vector{}
+            return false, Vector{}
         }
 
         //return true, InfinitePoint
-        fmt.Printf("instead of Infinity: %v \n", Add(e1.Pos, e1.Dir))
-        return true, Add(Mult(Add(e1.Pos, e2.Pos), 0.5), e1.Dir)
-        //return false, Vector{}
+        //fmt.Printf("instead of Infinity: %v \n", Add(e1.Pos, e1.Dir))
+        //return true, Add(Mult(Add(e1.Pos, e2.Pos), 0.5), e1.Dir)
+        return false, Vector{}
     }
 
     //fmt.Println(reflect.TypeOf(s1), reflect.TypeOf(det), reflect.TypeOf(s1/det))
