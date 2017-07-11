@@ -42,6 +42,7 @@ type HEFace struct {
     // Only arbitrary for closed faces!!!!
     // Otherwise it HAS to point to the FIRST edge (counter clockwise)!!!
     EEdge           EdgeIndex
+    EEdgeParallel   EdgeIndex
 
     // For convenience, so we don't have to recalculate all the time.
     //IsClosed        bool

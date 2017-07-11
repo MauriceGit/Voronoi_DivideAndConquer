@@ -154,6 +154,7 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
     // Lines are colinear.
     if math.Abs(det) <= EPS {
         return false, Vector{}
+        //return true, InfinitePoint
     }
 
     // Intersection is outside of either line, if (s1||s2)/det is outside of 0..1.

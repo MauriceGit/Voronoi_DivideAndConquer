@@ -653,8 +653,6 @@ func createLine (v *Voronoi, e EdgeIndex, amplified bool) Edge {
 // given face. With the restriction, that it can't be 'lastEdge'.
 func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge EdgeIndex, lastVertex Vector) (EdgeIndex, Vector) {
 
-    //fmt.Println("begin--------------------------------------------------")
-
     bestEdge := EmptyEdge
     bestIntersection := Vector{}
 
@@ -693,7 +691,7 @@ func calcHighestIntersection(v *Voronoi, bisector Edge, face FaceIndex, lastEdge
         first = false
         edge = v.edges[edge].ENext
     }
-    //fmt.Println("end----------------------------------------------------")
+
     return bestEdge, bestIntersection
 }
 
@@ -759,7 +757,7 @@ func isBetterUp(v1, v2, test Vector) bool {
         return true
     }
     side := SideOfLine(v1, v2, test)
-    if side <= EPS && side >= -EPS {
+    if math.Abs(side) <= EPS {
         return test.X >= v1.X && test.X <= v2.X
     }
     return false
@@ -770,7 +768,7 @@ func isBetterDown(v1, v2, test Vector) bool {
     }
 
     side := SideOfLine(v1, v2, test)
-    if side <= EPS && side >= -EPS {
+    if math.Abs(side) <= EPS {
         //fmt.Printf("we get here.\n")
         return test.X > v1.X && test.X < v2.X
     }
@@ -1250,6 +1248,28 @@ func testEqualIntersection02() {
 //
 // Test cases with linear dependent points or lines
 //
+func testLinearDepentence0() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_linear_dependence_0\n")
+    fmt.Printf("=============================\n")
+    var pointList PointList
+
+    pointList = append(pointList, Vector{20, 70, 0})
+    pointList = append(pointList, Vector{30, 70, 0})
+    pointList = append(pointList, Vector{40, 70, 0})
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_linear_dependence_01a", true)
+}
+
+//
+// Test cases with linear dependent points or lines
+//
 func testLinearDepentence01a() {
     fmt.Printf("=============================\n")
     fmt.Printf("=== test_linear_dependence_01\n")
@@ -1261,8 +1281,40 @@ func testLinearDepentence01a() {
     pointList = append(pointList, Vector{40, 70, 0})
     pointList = append(pointList, Vector{50, 70, 0})
 
-    pointList[0].Y -= 1;
-    pointList[3].Y -= 1;
+    //pointList[0].Y -= 1;
+    //pointList[3].Y -= 1;
+
+    //pointList = pointList[:len(pointList)/2]
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_linear_dependence_01a", true)
+}
+
+//
+// Special case, merging two linear dependent voronoi with eath other!
+//
+func testLinearDepentence05() {
+    fmt.Printf("=============================\n")
+    fmt.Printf("=== test_linear_dependence_05\n")
+    fmt.Printf("=============================\n")
+    var pointList PointList
+
+    pointList = append(pointList, Vector{20, 70, 0})
+    pointList = append(pointList, Vector{30, 70, 0})
+    pointList = append(pointList, Vector{40, 70, 0})
+
+    pointList = append(pointList, Vector{20, 80, 0})
+    pointList = append(pointList, Vector{30, 80, 0})
+    pointList = append(pointList, Vector{40, 80, 0})
+    //pointList = append(pointList, Vector{50, 70, 0})
+
+    //pointList[0].Y -= 1;
+    //pointList[3].Y -= 1;
 
     //pointList = pointList[:len(pointList)/2]
 
@@ -1796,7 +1848,9 @@ func main() {
         // works.
         // A first edge {-1 0 6 1 {{35 510 0} {0 -1000 0}}}: 1 must be referenced as first edge by the corresponding face 1 !
         fmt.Println("Test: testLinearDepentence02")
+        testLinearDepentence0()
         testLinearDepentence02()
+        testLinearDepentence05()
 
         // works.
         // A first edge {-2 1 -1 1 {{35 510 0} {-0 1000 -0}}}: 0 must be referenced as first edge by the corresponding face 1 !
@@ -1806,13 +1860,16 @@ func main() {
     }
 
     test := false
+    g_pprint = true
     g_drawImages = true
 
     if test {
         //testRandom(10000)
-        //testLinearDepentence01a()
+        testLinearDepentence0()
         //testLinearDepentence01b()
-        testUnknownProblem02()
+        //testUnknownProblem02()
+
+
     }
 
 }
