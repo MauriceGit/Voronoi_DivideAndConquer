@@ -1745,10 +1745,12 @@ func testUnknownProblem12() {
     v.createImage("test_unknown_problem_12", true)
 }
 
-func testUnknownProblemSeed(seed int64, count int) {
+func testUnknownProblem13() {
     fmt.Printf("===========================\n")
-    fmt.Printf("=== test_seed_%v\n", strconv.FormatInt(seed, 10))
+    fmt.Printf("=== test_unknown_problem_13\n")
     fmt.Printf("===========================\n")
+    count := 10000
+    var seed int64 = 1499748501205604561
     r := rand.New(rand.NewSource(seed))
     var pointList PointList
 
@@ -1758,6 +1760,43 @@ func testUnknownProblemSeed(seed int64, count int) {
     }
 
     sort.Sort(pointList)
+    pointList = pointList[1:]
+
+    //pointList = pointList[len(pointList)/2:]
+    pointList = pointList[:len(pointList)/2]
+    pointList = pointList[:len(pointList)/2]
+    pointList = pointList[len(pointList)/2:]
+    pointList = pointList[len(pointList)/2:]
+    pointList = pointList[len(pointList)/2:]
+    pointList = pointList[len(pointList)/2:]
+
+    v := CreateVoronoi(pointList)
+    v.pprint()
+
+    ch := v.ConvexHull(0)
+    fmt.Println(ch)
+
+    v.createImage("test_unknown_problem_13", true)
+}
+
+func testUnknownProblemSeed(seed int64, count int) {
+    fmt.Printf("===========================\n")
+    fmt.Printf("=== test_seed_%v\n", strconv.FormatInt(seed, 10))
+    fmt.Printf("===========================\n")
+    r := rand.New(rand.NewSource(seed))
+    var pointList PointList
+
+    for i:= 0; i < count; i++ {
+        v := Vector{r.Float64()*1000., r.Float64()*1000., 0}
+        pointList = append(pointList, v)
+    }
+
+    sort.Sort(pointList)
+
+
+    for _,v := range pointList {
+        fmt.Printf("%v\n", v)
+    }
 
     //pointList = pointList[len(pointList)/2:]
     //pointList = pointList[len(pointList)/2:]
@@ -1806,7 +1845,7 @@ func main() {
 
     g_drawImages = false
     g_pprint = false
-    working := true
+    working := false
 
     if working {
         testNormal01()
@@ -1829,7 +1868,7 @@ func main() {
         testUnknownProblemSeed(1483369884537650258, 20)
         testUnknownProblemSeed(1483370089898481236, 15)
         testUnknownProblem05()
-        //testUnknownProblem02()
+        testUnknownProblem02()
         testUnknownProblemSeed(1483370150842201370, 15)
         testUnknownProblemSeed(1483370130545841965, 15)
         testUnknownProblemSeed(1496121738043120503, 20)
@@ -1859,17 +1898,18 @@ func main() {
 
     }
 
-    test := false
+    test := true
     g_pprint = true
     g_drawImages = true
 
     if test {
         //testRandom(10000)
-        testLinearDepentence0()
+
+        //testUnknownProblemSeed(1499748501205604561, 10000)
+        testUnknownProblem13()
+
+        //testLinearDepentence0()
         //testLinearDepentence01b()
-        //testUnknownProblem02()
-
-
     }
 
 }

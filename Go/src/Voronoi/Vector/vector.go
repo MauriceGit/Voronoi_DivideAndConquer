@@ -14,6 +14,10 @@ var InfinitePoint = Vector{-100000000,-100000000, -100000000}
 
 // Because of laziness, a Vector could also just be a point. Depending on context.
 type Vector struct {
+
+    // Potentially changing to float128 --> https://gist.github.com/grd/4050062
+    // Or math/big --> https://golang.org/pkg/math/big/
+
     X,Y,Z   float64
 }
 
@@ -153,8 +157,8 @@ func LineIntersection4(e1 Edge, e2 Edge) (bool, Vector) {
 
     // Lines are colinear.
     if math.Abs(det) <= EPS {
-        return false, Vector{}
-        //return true, InfinitePoint
+        //return false, Vector{}
+        return true, InfinitePoint
     }
 
     // Intersection is outside of either line, if (s1||s2)/det is outside of 0..1.
