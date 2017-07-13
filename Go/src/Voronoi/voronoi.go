@@ -140,7 +140,7 @@ func (v *Voronoi)createImage(filename string, whole bool) {
     //c := color.RGBA{0,255,0,255}
     gc := draw2dimg.NewGraphicContext(m)
 
-    gc.SetLineWidth(2)
+    gc.SetLineWidth(1)
     gc.SetStrokeColor(c)
 
     for i,e := range v.edges {
@@ -348,11 +348,13 @@ func drawDividingChain(chain []ChainElem) {
     }
 
     var w, h int = 1000, 1000
+    scaleX := 10.0
+    scaleY := 10.0
 
     m := image.NewRGBA(image.Rect(0, 0, w, h))
 
     // blue
-    c := color.RGBA{0,0,255,255}
+    c := color.RGBA{255,0,0,255}
     // green
     //c := color.RGBA{0,255,0,255}
     gc := draw2dimg.NewGraphicContext(m)
@@ -364,11 +366,11 @@ func drawDividingChain(chain []ChainElem) {
     empty := Vector{}
     for i,ch := range chain {
         if ch.intersection != empty {
-            drawCircle(m, int(ch.intersection.X*10), h-int(ch.intersection.Y*10), 3, c)
+            drawCircle(m, int(ch.intersection.X*scaleX), h-int(ch.intersection.Y*scaleY), 3, c)
 
             if i > 0 {
-                gc.MoveTo(chain[i-1].intersection.X*10., float64(h) - chain[i-1].intersection.Y*10.)
-                gc.LineTo(ch.intersection.X*10., float64(h) - ch.intersection.Y*10.)
+                gc.MoveTo(chain[i-1].intersection.X*scaleX, float64(h) - chain[i-1].intersection.Y*scaleY)
+                gc.LineTo(ch.intersection.X*scaleX, float64(h) - ch.intersection.Y*scaleY)
                 gc.FillStroke()
                 gc.Close()
             }
@@ -781,8 +783,9 @@ func isBetterDown(v1, v2, test Vector) bool {
 //
 func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem {
     var dividingChain []ChainElem
+    var loopCount = 0
 
-    //fmt.Printf("dividing chain for recursion: %v\n", g_recursions)
+    fmt.Printf("dividing chain for recursion: %v\n", g_recursions)
 
     h1 := v.ConvexHull(left)
     h2 := v.ConvexHull(right)
@@ -801,6 +804,8 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     // Lower common support line!
     h1Down, h2Down := commonSupportLine(v,  h1, h2, isRight, isLeft, isBetterDown)
 
+    fmt.Printf("P: %v, Q: %v, h1Down: %v, h2Down: %v\n", p, q, h1Down, h2Down)
+
     // We don't cross the same edge twice!
     lastPEdge := EmptyEdge
     lastQEdge := EmptyEdge
@@ -812,18 +817,20 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
     // As long as we didn't reach the lowest possible tangente, we continue.
     for {
-        if g_recursions == 14 {
-            //drawDividingChain(dividingChain)
+        if g_recursions == 156 && loopCount == 160 {
+            //fmt.Printf("draw dividing chain. LoopCount == 200\n")
+            drawDividingChain(dividingChain)
+            os.Exit(0)
         }
         //fmt.Printf("for with p == %v, q == %v\n", p, q)
         // Here we break out of the loop, when we reach the very bottom!
         lastMerge := p == h1Down && q == h2Down
-        //fmt.Printf("p: %v, q: %v, h1Down: %v, h2Down: %v, lastMerge: %v\n", p, q, h1Down, h2Down, lastMerge)
+        fmt.Printf("p: %v, q: %v, h1Down: %v, h2Down: %v\n", p, q, h1Down, h2Down)
 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
-        //fmt.Printf("found P intersection\n")
+        //fmt.Printf("found P intersection: %v\n", locationP)
         edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
-        //fmt.Printf("found Q intersection\n")
+        //fmt.Printf("found Q intersection: %v\n", locationQ)
 
         switch {
 
@@ -850,7 +857,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face p
             case edgeP != EmptyEdge && (edgeQ == EmptyEdge || locationP.Y >= locationQ.Y):
-                fmt.Printf("p\n")
+                //fmt.Printf("p\n")
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, EmptyEdge, p, q, bisector})
 
                 lastVertex   = locationP
@@ -861,7 +868,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
             // We intersect with an edge of the face q
             case edgeQ != EmptyEdge && (edgeP == EmptyEdge || locationQ.Y >= locationP.Y):
-                fmt.Printf("q\n")
+                //fmt.Printf("q\n")
                 dividingChain = append(dividingChain, ChainElem{locationQ, EmptyEdge, edgeQ, p, q, bisector})
 
                 lastVertex   = locationQ
@@ -876,7 +883,9 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
                 lastMerge = true
                 v.pprint()
                 os.Exit(0)
+
         }
+
 
         if lastMerge {
             break
@@ -884,7 +893,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
 
         bisector = PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
         bisector = Amplify(bisector, 100.0)
-
+        loopCount += 1
     }
 
     if g_recursions == 24 {
@@ -1755,20 +1764,22 @@ func testUnknownProblem13() {
     var pointList PointList
 
     for i:= 0; i < count; i++ {
-        v := Vector{r.Float64()*100., r.Float64()*100., 0}
+        v := Vector{r.Float64()*100. - 60., r.Float64()*100. - 60., 0}
         pointList = append(pointList, v)
     }
 
     sort.Sort(pointList)
     pointList = pointList[1:]
 
-    //pointList = pointList[len(pointList)/2:]
     pointList = pointList[:len(pointList)/2]
     pointList = pointList[:len(pointList)/2]
     pointList = pointList[len(pointList)/2:]
     pointList = pointList[len(pointList)/2:]
     pointList = pointList[len(pointList)/2:]
     pointList = pointList[len(pointList)/2:]
+
+    pointList = pointList[:len(pointList)/2]
+
 
     v := CreateVoronoi(pointList)
     v.pprint()
