@@ -804,8 +804,6 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     // Lower common support line!
     h1Down, h2Down := commonSupportLine(v,  h1, h2, isRight, isLeft, isBetterDown)
 
-    fmt.Printf("P: %v, Q: %v, h1Down: %v, h2Down: %v\n", p, q, h1Down, h2Down)
-
     // We don't cross the same edge twice!
     lastPEdge := EmptyEdge
     lastQEdge := EmptyEdge
@@ -813,7 +811,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
     lastVertex := Vector{}
 
     bisector := PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
-    bisector = Amplify(bisector, 100.0)
+    //bisector = Amplify(bisector, 100.0)
 
     // As long as we didn't reach the lowest possible tangente, we continue.
     for {
@@ -828,22 +826,22 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         fmt.Printf("p: %v, q: %v, h1Down: %v, h2Down: %v\n", p, q, h1Down, h2Down)
 
         edgeP, locationP := calcHighestIntersection(v, bisector, p, lastPEdge, lastVertex)
-        //fmt.Printf("found P intersection: %v\n", locationP)
+        fmt.Printf("found P intersection: %v\n", locationP.Y)
         edgeQ, locationQ := calcHighestIntersection(v, bisector, q, lastQEdge, lastVertex)
-        //fmt.Printf("found Q intersection: %v\n", locationQ)
+        fmt.Printf("found Q intersection: %v\n", locationQ.Y)
 
         switch {
 
             // For the case, that we merge two trivial voronois with no edges or
             // the very last step. Now just create two edges and we're done.
             case edgeP == EmptyEdge && edgeQ == EmptyEdge:
-                //fmt.Printf("e\n")
+                fmt.Printf("e\n")
                 dividingChain = append(dividingChain, ChainElem{Vector{}, EmptyEdge, EmptyEdge, p, q, bisector})
 
             // Equal Intersection with both edges. So 4 edges meet.
             case edgeQ != EmptyEdge && edgeP != EmptyEdge && Equal(locationP, locationQ):
                 fmt.Printf("p && q\n")
-                // This could result in kind of an invalid Delaunay triangulations. At least regarding a triangle.
+                // This could result in kind of an ambiguous Delaunay triangulations. At least regarding a triangle.
                 // This should now work for situations, where 4 edges meet. I have to re-examine for even more edges meeting...
 
                 dividingChain = append(dividingChain, ChainElem{locationP, edgeP, edgeQ, p, q, bisector})
@@ -892,7 +890,7 @@ func (v *Voronoi)extractDividingChain(left, right VoronoiEntryFace) []ChainElem 
         }
 
         bisector = PerpendicularBisector(v.faces[p].ReferencePoint, v.faces[q].ReferencePoint)
-        bisector = Amplify(bisector, 100.0)
+        //bisector = Amplify(bisector, 100.0)
         loopCount += 1
     }
 
@@ -1764,12 +1762,12 @@ func testUnknownProblem13() {
     var pointList PointList
 
     for i:= 0; i < count; i++ {
-        v := Vector{r.Float64()*100. - 60., r.Float64()*100. - 60., 0}
+        v := Vector{r.Float64()*100., r.Float64()*100., 0}
         pointList = append(pointList, v)
     }
 
     sort.Sort(pointList)
-    pointList = pointList[1:]
+    //pointList = pointList[1:]
 
     pointList = pointList[:len(pointList)/2]
     pointList = pointList[:len(pointList)/2]
@@ -1778,8 +1776,11 @@ func testUnknownProblem13() {
     pointList = pointList[len(pointList)/2:]
     pointList = pointList[len(pointList)/2:]
 
-    pointList = pointList[:len(pointList)/2]
+    pointList = pointList[len(pointList)/2:]
+    pointList = pointList[len(pointList)/2:]
 
+    // Before coming here, both *100 and *500 are perfectly identical!
+    // Not true, it just doesn't cause an error...
 
     v := CreateVoronoi(pointList)
     v.pprint()
